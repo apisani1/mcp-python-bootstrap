@@ -53,6 +53,23 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Standardized UV PATH setup (POSIX-compliant)
+setup_uv_path() {
+    # Only add to PATH if not already present
+    case ":$PATH:" in
+        *":$HOME/.local/bin:"*) ;;
+        *) PATH="$HOME/.local/bin:$PATH" ;;
+    esac
+
+    case ":$PATH:" in
+        *":$HOME/.cargo/bin:"*) ;;
+        *) PATH="$HOME/.cargo/bin:$PATH" ;;
+    esac
+
+    export PATH
+    log "UV PATH configured: ~/.local/bin and ~/.cargo/bin added to PATH"
+}
+
 # Platform detection (POSIX-compliant)
 detect_platform() {
     # Simple platform detection
@@ -113,8 +130,7 @@ install_uv() {
     fi
 
     # Add to PATH
-    PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
-    export PATH
+    setup_uv_path
 
     # Verify installation
     if ! command_exists uv; then
@@ -148,11 +164,10 @@ run_server() {
     log "Starting MCP server: $PACKAGE_SPEC"
 
     # Ensure PATH
-    PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
-    export PATH
+    setup_uv_path
 
-    # Execute server with all remaining arguments
-    shift # Remove package spec from arguments
+    # Execute server with all arguments (package spec handled separately)
+    # The main() function will pass the correct arguments via "$@"
 
     log "Executing: uvx $PACKAGE_SPEC $*"
 
@@ -172,15 +187,20 @@ main() {
     if ! check_uvx; then
         if ! check_uv; then
             install_uv
+        else
+            log "uv found, setting up PATH for uvx"
+            setup_uv_path
         fi
 
-        # Check again after installation
+        # Final verification after installation/setup
         if ! check_uvx; then
-            error "uvx still not available after uv installation"
+            error "uvx still not available after installation process"
         fi
+        success "uvx installation verified successfully"
     fi
 
-    # Run the server
+    # Run the server (shift to remove package spec, pass remaining args)
+    shift
     run_server "$@"
 }
 

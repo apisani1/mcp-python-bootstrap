@@ -180,7 +180,18 @@ execute_platform_script() {
             ;;
         windows-native-*|*-powershell-*)
             local ps_script=$(download_script "bootstrap.ps1")
-            printf '%s' "$ps_script" | powershell -ExecutionPolicy Bypass -Command "& {[ScriptBlock]::Create(\$input).Invoke('$1')}"
+            # Build PowerShell arguments array properly
+            local ps_args=""
+            local first_arg=true
+            for arg in "$@"; do
+                if [ "$first_arg" = true ]; then
+                    ps_args="'$arg'"
+                    first_arg=false
+                else
+                    ps_args="$ps_args, '$arg'"
+                fi
+            done
+            printf '%s' "$ps_script" | powershell -ExecutionPolicy Bypass -Command "& {[ScriptBlock]::Create(\$input).Invoke($ps_args)}"
             ;;
         *)
             error "Unsupported platform: $platform. Supported: Linux, macOS, Windows, FreeBSD, Alpine"

@@ -83,6 +83,24 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Standardized UV PATH setup
+setup_uv_path() {
+    local uv_dirs="$HOME/.local/bin:$HOME/.cargo/bin"
+
+    # Only add to PATH if not already present
+    case ":$PATH:" in
+        *":$HOME/.local/bin:"*) ;;
+        *) export PATH="$HOME/.local/bin:$PATH" ;;
+    esac
+
+    case ":$PATH:" in
+        *":$HOME/.cargo/bin:"*) ;;
+        *) export PATH="$HOME/.cargo/bin:$PATH" ;;
+    esac
+
+    log "UV PATH configured: ~/.local/bin and ~/.cargo/bin added to PATH"
+}
+
 # Network connectivity check
 check_network() {
     log "Checking network connectivity..."
@@ -181,7 +199,7 @@ install_uv_with_retry() {
     fi
 
     # Add uv to PATH for current session
-    export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+    setup_uv_path
 
     # Verify installation
     if ! command_exists uv; then
@@ -196,53 +214,136 @@ install_uv_with_retry() {
     success "uv installed and verified successfully"
 }
 
-# Verify package exists on PyPI
-verify_package_exists() {
+# Detect package type
+detect_package_type() {
+    local package_spec="$1"
+
+    if [[ "$package_spec" == git+* ]]; then
+        echo "git"
+    elif [[ "$package_spec" == /* ]] || [[ "$package_spec" == ./* ]] || [[ "$package_spec" == ../* ]]; then
+        echo "local"
+    elif [[ "$package_spec" == -e* ]]; then
+        echo "editable"
+    else
+        echo "pypi"
+    fi
+}
+
+# Validate git URL package
+validate_git_package() {
+    local package_spec="$1"
+
+    # Basic git URL validation
+    if [[ "$package_spec" =~ ^git\+https?://[a-zA-Z0-9.-]+/[a-zA-Z0-9._/-]+\.git ]]; then
+        log "Git URL format appears valid"
+        return 0
+    else
+        warn "Git URL format may be invalid: $package_spec"
+        return 1
+    fi
+}
+
+# Validate local path package
+validate_local_package() {
+    local package_spec="$1"
+    local path="$package_spec"
+
+    # Remove -e prefix for editable installs
+    if [[ "$package_spec" == -e* ]]; then
+        path="${package_spec#-e}"
+        path="${path#[[:space:]]}"
+    fi
+
+    if [[ -d "$path" ]] || [[ -f "$path" ]]; then
+        log "Local path exists: $path"
+        return 0
+    else
+        warn "Local path does not exist: $path"
+        return 1
+    fi
+}
+
+# Verify PyPI package exists
+verify_pypi_package() {
     local package_spec="$1"
     local package_name
 
-    # Extract package name (remove version specifiers)
-    package_name=$(echo "$package_spec" | sed -E 's/([a-zA-Z0-9_-]+).*/\1/' | sed 's/git+https:\/\/.*\///' | sed 's/\.git.*//')
+    # Extract package name (remove version specifiers and extras)
+    package_name=$(echo "$package_spec" | sed -E 's/([a-zA-Z0-9_-]+).*/\1/')
 
-    log "Verifying package exists: $package_name"
+    log "Verifying PyPI package exists: $package_name"
 
-    # Skip verification for git URLs and local paths
-    if [[ "$package_spec" == git+* ]] || [[ "$package_spec" == /* ]] || [[ "$package_spec" == ./* ]]; then
-        log "Skipping PyPI verification for non-PyPI package"
-        return 0
+    # Try with curl first (lighter weight)
+    if command_exists curl; then
+        local status_code
+        status_code=$(curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/$package_name/json" --connect-timeout 5)
+        if [[ "$status_code" == "200" ]]; then
+            log "Package found on PyPI: $package_name"
+            return 0
+        elif [[ "$status_code" == "404" ]]; then
+            warn "Package not found on PyPI: $package_name"
+            return 1
+        else
+            warn "Could not verify package on PyPI (HTTP $status_code)"
+            return 0  # Don't fail on network issues
+        fi
     fi
 
-    # Use Python to check PyPI if available
+    # Fallback to Python if available
     if command_exists python3; then
         if python3 -c "
 import urllib.request
 import json
 import sys
-import ssl
 
 package_name = sys.argv[1]
 url = f'https://pypi.org/pypi/{package_name}/json'
 
 try:
-    # Handle SSL issues in some environments
-    context = ssl.create_default_context()
-    context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE
-
-    with urllib.request.urlopen(url, context=context, timeout=10) as response:
-        data = json.loads(response.read())
-        print(f'✓ Package found: {data[\"info\"][\"name\"]} {data[\"info\"][\"version\"]}')
-except Exception as e:
-    print(f'✗ Package verification failed: {e}', file=sys.stderr)
+    with urllib.request.urlopen(url, timeout=10) as response:
+        if response.status == 200:
+            data = json.loads(response.read())
+            print(f'Package found: {data[\"info\"][\"name\"]} {data[\"info\"][\"version\"]}')
+        else:
+            sys.exit(1)
+except Exception:
     sys.exit(1)
 " "$package_name" 2>/dev/null; then
             log "Package verification successful"
+            return 0
         else
             warn "Could not verify package on PyPI (may still work)"
+            return 0  # Don't fail on verification issues
         fi
     else
-        log "Python not available for package verification"
+        log "Cannot verify PyPI package - no curl or python3 available"
+        return 0  # Don't fail if we can't verify
     fi
+}
+
+# Enhanced package verification
+verify_package_exists() {
+    local package_spec="$1"
+    local package_type
+
+    package_type=$(detect_package_type "$package_spec")
+    log "Package type detected: $package_type"
+
+    case "$package_type" in
+        git)
+            validate_git_package "$package_spec"
+            ;;
+        local|editable)
+            validate_local_package "$package_spec"
+            ;;
+        pypi)
+            verify_pypi_package "$package_spec"
+            ;;
+        *)
+            warn "Unknown package type, proceeding anyway"
+            return 0
+            ;;
+    esac
 }
 
 # Validate package specification
@@ -295,7 +396,7 @@ run_server_monitored() {
     log "Starting monitored MCP server: $PACKAGE_SPEC"
 
     # Ensure PATH includes uv
-    export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+    setup_uv_path
     export UV_CACHE_DIR="$UV_CACHE_DIR"
 
     # Create startup marker
@@ -357,11 +458,17 @@ main() {
             install_uv_with_retry
         else
             log "uv found, uvx should be available"
-            export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+            setup_uv_path
             if ! check_uvx; then
                 error "uv found but uvx not working"
             fi
         fi
+
+        # Final verification that uvx is available after installation
+        if ! check_uvx; then
+            error "uvx still not available after installation process"
+        fi
+        success "uvx installation verified successfully"
     fi
 
     # Run the server

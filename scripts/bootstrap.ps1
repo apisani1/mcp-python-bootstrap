@@ -418,6 +418,12 @@ function Main {
                 Write-Error-Log "uv found but uvx not working"
             }
         }
+
+        # Final verification that uvx is available after installation
+        if (-not (Test-Uvx)) {
+            Write-Error-Log "uvx still not available after installation process"
+        }
+        Write-Success-Log "uvx installation verified successfully"
     }
 
     # Run the server
