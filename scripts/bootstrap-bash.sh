@@ -449,7 +449,7 @@ run_server_monitored() {
 
         # Execute directly with Python
         log "Executing: python3 $temp_file ${SCRIPT_ARGS[*]-}"
-        if python3 "$temp_file" "${SCRIPT_ARGS[@]}"; then
+        if python3 "$temp_file" "${SCRIPT_ARGS[@]:-}"; then
             success "Server exited normally"
         else
             local exit_code=$?
@@ -461,7 +461,7 @@ run_server_monitored() {
     elif [[ "$package_type" == "local" ]]; then
         # For local Python files, execute directly
         log "Executing local Python file: python3 $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
-        if python3 "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]}"; then
+        if python3 "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"; then
             success "Server exited normally"
         else
             local exit_code=$?
@@ -469,7 +469,7 @@ run_server_monitored() {
         fi
     else
         # For PyPI/git packages, use uvx
-        if uvx "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]}"; then
+        if uvx "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"; then
             success "Server exited normally"
         else
             local exit_code=$?
