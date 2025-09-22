@@ -1,6 +1,99 @@
 # Usage Guide
 
-## Basic Usage
+## Configuration Generator (`mcp_config.py`)
+
+The fastest and easiest way to configure Python MCP servers is using our configuration generator script.
+
+### Quick Start
+
+```bash
+# Basic PyPI package
+python3 scripts/mcp_config.py mcp-server-filesystem
+
+# Package with specific version
+python3 scripts/mcp_config.py mcp-server-database==1.2.0
+
+# Git repository
+python3 scripts/mcp_config.py git+https://github.com/user/mcp-server.git --name custom-server
+
+# Local development
+python3 scripts/mcp_config.py ./src/my_server.py --name my-server
+
+# With server arguments
+python3 scripts/mcp_config.py mcp-server-database --args "--port,8080,--verbose"
+```
+
+### Command Line Options
+
+```bash
+python3 mcp_config.py <package_spec> [options]
+
+Options:
+  --name NAME         Server name (auto-detected if not provided)
+  --config FILE       Config file path (default: Claude desktop config)
+  --args ARGS         Additional server arguments (comma-separated)
+  --help, -h          Show help message
+```
+
+### Package Specifications
+
+| Type | Example | Description |
+|------|---------|-------------|
+| **PyPI** | `mcp-server-filesystem` | Latest version from PyPI |
+| **Versioned** | `mcp-server-database==1.2.0` | Specific version |
+| **Git HTTPS** | `git+https://github.com/user/repo.git` | Git repository |
+| **Git Branch** | `git+https://github.com/user/repo.git@main` | Specific branch |
+| **Local File** | `./src/server.py` | Local Python file |
+| **Local Package** | `-e ./my-package` | Editable local package |
+
+### Generated Configuration
+
+The script automatically creates optimized MCP configurations:
+
+```json
+{
+  "mcpServers": {
+    "mcp-server-filesystem": {
+      "command": "bash",
+      "args": [
+        "/path/to/universal-bootstrap.sh",
+        "mcp-server-filesystem"
+      ],
+      "_metadata": {
+        "package_type": "pypi",
+        "package_spec": "mcp-server-filesystem",
+        "generated_by": "mcp_config.py",
+        "bootstrap_version": "1.2.0"
+      }
+    }
+  }
+}
+```
+
+### Advanced Examples
+
+```bash
+# Development workflow
+python3 scripts/mcp_config.py ./src/my_server.py \
+  --name dev-server \
+  --args "--debug,--reload" \
+  --config ./dev-config.json
+
+# Production setup
+python3 scripts/mcp_config.py mcp-server-web==2.1.0 \
+  --name production-web \
+  --args "--host,0.0.0.0,--port,8080,--workers,4"
+
+# Git repository with credentials
+python3 scripts/mcp_config.py git+https://user:token@github.com/private/repo.git \
+  --name private-server
+```
+
+## Manual Bootstrap Usage
+
+For advanced use cases or when you need direct control over the bootstrap process.
+
+### Basic Usage
 
 The MCP Python Bootstrap provides a universal way to run Python MCP servers without requiring pre-installed Python environments.
 

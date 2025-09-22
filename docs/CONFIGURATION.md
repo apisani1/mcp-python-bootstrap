@@ -1,5 +1,72 @@
 # Configuration Guide
 
+## Configuration Generator (`mcp_config.py`)
+
+The easiest way to configure MCP servers is using our automated configuration generator.
+
+### Quick Configuration
+
+```bash
+# Generate config for PyPI package
+python3 scripts/mcp_config.py mcp-server-filesystem
+
+# Generate config for Git repository
+python3 scripts/mcp_config.py git+https://github.com/user/repo.git --name custom-server
+
+# Generate config for local development
+python3 scripts/mcp_config.py ./src/server.py --name dev-server --args "--debug,--reload"
+```
+
+### Configuration Options
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| `--name` | Server name (auto-detected if not provided) | `--name my-server` |
+| `--config` | Config file path | `--config ./custom-config.json` |
+| `--args` | Server arguments (comma-separated) | `--args "--port,8080,--verbose"` |
+
+### Generated Configuration Format
+
+The generator creates optimized configurations using the universal bootstrap system:
+
+```json
+{
+  "mcpServers": {
+    "server-name": {
+      "command": "bash",
+      "args": [
+        "/path/to/universal-bootstrap.sh",
+        "package-spec",
+        "--server-arg1",
+        "--server-arg2"
+      ],
+      "_metadata": {
+        "package_type": "pypi|git|local",
+        "package_spec": "original-specification",
+        "generated_by": "mcp_config.py",
+        "bootstrap_version": "1.2.0"
+      }
+    }
+  }
+}
+```
+
+### Custom Configuration File Location
+
+```bash
+# Use custom config file location
+python3 scripts/mcp_config.py mcp-server-database \
+  --config "~/my-custom-config.json"
+
+# For different Claude profiles
+python3 scripts/mcp_config.py mcp-server-web \
+  --config "~/Library/Application Support/Claude/dev_config.json"
+```
+
+## Manual Configuration
+
+For advanced use cases where you need full control over the configuration.
+
 ## Environment Variables
 
 The MCP Python Bootstrap system can be configured using environment variables:
@@ -60,7 +127,26 @@ These variables are passed through to the `uv` package manager:
 
 ## MCP Server Configuration
 
-### Basic Configuration
+### Basic Manual Configuration
+
+When you need to configure servers manually without the generator:
+
+```json
+{
+  "mcpServers": {
+    "server-name": {
+      "command": "bash",
+      "args": [
+        "/path/to/universal-bootstrap.sh",
+        "package-name",
+        "server-args..."
+      ]
+    }
+  }
+}
+```
+
+### Remote Bootstrap Configuration
 
 ```json
 {

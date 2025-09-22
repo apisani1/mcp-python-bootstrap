@@ -1,10 +1,55 @@
 # MCP Python Bootstrap
 
-Universal cross-platform bootstrap solution for Python MCP (Model Context Protocol) servers.
+Universal cross-platform bootstrap solution for Python MCP (Model Context Protocol) servers. Provides NPX-like functionality for Python packages using uvx.
 
 ## Quick Start
 
-### Basic Usage
+### 🚀 Easy Configuration Generator
+
+The fastest way to add Python MCP servers to your configuration:
+
+```bash
+# Install from PyPI
+python3 scripts/mcp_config.py mcp-server-filesystem
+
+# Local development
+python3 scripts/mcp_config.py ./src/my_server.py --name my-server
+
+# With specific version and arguments
+python3 scripts/mcp_config.py mcp-server-database==1.2.0 --args "--port,8080,--verbose"
+
+# From Git repository
+python3 scripts/mcp_config.py git+https://github.com/user/mcp-server.git --name custom-server
+```
+
+### 📋 Generated Configuration
+
+The `mcp_config.py` script automatically generates optimized MCP configurations:
+
+```json
+{
+  "mcpServers": {
+    "mcp-server-filesystem": {
+      "command": "bash",
+      "args": [
+        "./scripts/universal-bootstrap.sh",
+        "mcp-server-filesystem"
+      ],
+      "_metadata": {
+        "package_type": "pypi",
+        "package_spec": "mcp-server-filesystem",
+        "generated_by": "mcp_config.py",
+        "bootstrap_version": "1.2.0"
+      }
+    }
+  }
+}
+```
+
+### 🔧 Manual Configuration
+
+For advanced use cases, you can configure servers manually:
+
 ```json
 {
   "mcpServers": {
@@ -19,23 +64,16 @@ Universal cross-platform bootstrap solution for Python MCP (Model Context Protoc
 }
 ```
 
-### Advanced Usage
-```json
-{
-  "mcpServers": {
-    "database": {
-      "command": "sh",
-      "args": [
-        "-c",
-        "curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-database==1.2.0 --config config.json"
-      ]
-    }
-  }
-}
-```
-
 ## Features
 
+### 🎯 Configuration Generator (`mcp_config.py`)
+- **Smart Package Detection**: Supports PyPI, Git, and local packages automatically
+- **Server Name Auto-Detection**: Extracts server names from FastMCP patterns
+- **Flexible Arguments**: Pass custom arguments to your MCP servers
+- **Configuration Management**: Updates existing configs safely
+- **Metadata Tracking**: Tracks package type and generation details
+
+### 🛠️ Bootstrap System
 - **Zero Prerequisites**: No Python, pip, or uvx installation required
 - **Cross-Platform**: Works on Linux, macOS, Windows, Alpine, FreeBSD
 - **Smart Caching**: Caches environments and scripts for faster startup
