@@ -124,7 +124,8 @@ def create_or_update_config(
             # For GitHub raw URLs, convert to proper format and use remote bootstrap
             # Convert GitHub blob URLs to raw URLs if needed
             if "/blob/" in package_spec:
-                raw_url = package_spec.replace("/blob/", "/raw/")
+                # Convert github.com/user/repo/blob/branch/file to raw.githubusercontent.com/user/repo/branch/file
+                raw_url = package_spec.replace("github.com/", "raw.githubusercontent.com/").replace("/blob/", "/")
             else:
                 raw_url = package_spec
 

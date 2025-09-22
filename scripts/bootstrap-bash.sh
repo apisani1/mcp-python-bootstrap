@@ -220,7 +220,9 @@ detect_package_type() {
 
     if [[ "$package_spec" == git+* ]]; then
         echo "git"
-    elif [[ "$package_spec" == /* ]] || [[ "$package_spec" == ./* ]] || [[ "$package_spec" == ../* ]]; then
+    elif [[ "$package_spec" == https://github.com/* ]] || [[ "$package_spec" == http://github.com/* ]] || [[ "$package_spec" == https://raw.githubusercontent.com/* ]] || [[ "$package_spec" == https://gitlab.com/* ]] || [[ "$package_spec" == https://bitbucket.org/* ]]; then
+        echo "github_raw"
+    elif [[ "$package_spec" == /* ]] || [[ "$package_spec" == ./* ]] || [[ "$package_spec" == ../* ]] || [[ "$package_spec" == */*.py ]] || [[ "$package_spec" == *.py ]]; then
         echo "local"
     elif [[ "$package_spec" == -e* ]]; then
         echo "editable"
@@ -333,6 +335,10 @@ verify_package_exists() {
         git)
             validate_git_package "$package_spec"
             ;;
+        github_raw)
+            log "GitHub raw URL detected, proceeding with download"
+            return 0
+            ;;
         local|editable)
             validate_local_package "$package_spec"
             ;;
@@ -411,7 +417,7 @@ run_server_monitored() {
     trap cleanup EXIT INT TERM
 
     # Log the command being executed
-    log "Executing: uvx $PACKAGE_SPEC ${SCRIPT_ARGS[*]}"
+    log "Executing: uvx $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
 
     # Start the server with timeout monitoring
     (
@@ -422,12 +428,53 @@ run_server_monitored() {
     ) &
     local monitor_pid=$!
 
-    # Execute the server
-    if uvx "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]}"; then
-        success "Server exited normally"
+    # Execute the server based on package type
+    local package_type
+    package_type=$(detect_package_type "$PACKAGE_SPEC")
+
+    if [[ "$package_type" == "github_raw" ]]; then
+        # For GitHub raw URLs, download and execute directly with Python
+        log "Downloading GitHub raw URL for direct execution"
+        local temp_file="/tmp/mcp_server_$$.py"
+
+        if command_exists curl; then
+            if curl -sSfL "$PACKAGE_SPEC" -o "$temp_file"; then
+                log "Downloaded $PACKAGE_SPEC to $temp_file"
+            else
+                error "Failed to download $PACKAGE_SPEC"
+            fi
+        else
+            error "curl is required to download GitHub raw URLs"
+        fi
+
+        # Execute directly with Python
+        log "Executing: python3 $temp_file ${SCRIPT_ARGS[*]-}"
+        if python3 "$temp_file" "${SCRIPT_ARGS[@]}"; then
+            success "Server exited normally"
+        else
+            local exit_code=$?
+            error "Server exited with code $exit_code"
+        fi
+
+        # Cleanup
+        rm -f "$temp_file"
+    elif [[ "$package_type" == "local" ]]; then
+        # For local Python files, execute directly
+        log "Executing local Python file: python3 $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
+        if python3 "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]}"; then
+            success "Server exited normally"
+        else
+            local exit_code=$?
+            error "Server exited with code $exit_code"
+        fi
     else
-        local exit_code=$?
-        error "Server exited with code $exit_code"
+        # For PyPI/git packages, use uvx
+        if uvx "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]}"; then
+            success "Server exited normally"
+        else
+            local exit_code=$?
+            error "Server exited with code $exit_code"
+        fi
     fi
 
     # Stop monitor

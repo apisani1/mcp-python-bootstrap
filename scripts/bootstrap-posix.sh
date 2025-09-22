@@ -144,6 +144,17 @@ install_uv() {
     success "uv installed successfully"
 }
 
+# Detect package type (POSIX-compliant)
+detect_package_type() {
+    case "$1" in
+        git+*) echo "git" ;;
+        https://github.com/*|http://github.com/*|https://raw.githubusercontent.com/*|https://gitlab.com/*|https://bitbucket.org/*) echo "github_raw" ;;
+        /*|./*|../*) echo "local" ;;
+        -e*) echo "editable" ;;
+        *) echo "pypi" ;;
+    esac
+}
+
 # Validate package spec (POSIX-compliant)
 validate_package_spec() {
     if [ -z "$PACKAGE_SPEC" ]; then
@@ -151,6 +162,10 @@ validate_package_spec() {
     fi
 
     log "Package specification: $PACKAGE_SPEC"
+
+    # Detect and log package type
+    package_type=$(detect_package_type "$PACKAGE_SPEC")
+    log "Package type detected: $package_type"
 
     # Basic validation
     case "$PACKAGE_SPEC" in
@@ -166,13 +181,30 @@ run_server() {
     # Ensure PATH
     setup_uv_path
 
-    # Execute server with all arguments (package spec handled separately)
-    # The main() function will pass the correct arguments via "$@"
+    # Detect package type and execute accordingly
+    package_type=$(detect_package_type "$PACKAGE_SPEC")
 
-    log "Executing: uvx $PACKAGE_SPEC $*"
+    if [ "$package_type" = "github_raw" ]; then
+        # For GitHub raw URLs, download and execute
+        log "Downloading GitHub raw URL for execution"
+        temp_file="/tmp/mcp_server_$$.py"
 
-    # Use exec to replace current process
-    exec uvx "$PACKAGE_SPEC" "$@"
+        if command -v curl >/dev/null 2>&1; then
+            if curl -sSfL "$PACKAGE_SPEC" -o "$temp_file"; then
+                log "Downloaded $PACKAGE_SPEC to $temp_file"
+                log "Executing: python3 $temp_file $*"
+                exec python3 "$temp_file" "$@"
+            else
+                error "Failed to download $PACKAGE_SPEC"
+            fi
+        else
+            error "curl is required to download GitHub raw URLs"
+        fi
+    else
+        # For PyPI/git packages, use uvx
+        log "Executing: uvx $PACKAGE_SPEC $*"
+        exec uvx "$PACKAGE_SPEC" "$@"
+    fi
 }
 
 # Main function
