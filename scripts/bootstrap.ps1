@@ -14,10 +14,10 @@ $ErrorActionPreference = "Stop"
 $ScriptVersion = "1.2.0"
 
 # Configuration
-$CacheDir = if ($env:MCP_BOOTSTRAP_CACHE_DIR) { $env:MCP_BOOTSTRAP_CACHE_DIR } else { "$env:USERPROFILE\.mcp\cache" }
-$BootstrapDir = if ($env:MCP_BOOTSTRAP_BOOTSTRAP_DIR) { $env:MCP_BOOTSTRAP_BOOTSTRAP_DIR } else { "$env:USERPROFILE\.mcp\bootstrap" }
-$LogFile = "$BootstrapDir\bootstrap.log"
-$UvCacheDir = "$CacheDir\uv"
+$CacheDir = if ($env:MCP_BOOTSTRAP_CACHE_DIR) { $env:MCP_BOOTSTRAP_CACHE_DIR } else { Join-Path $env:USERPROFILE ".mcp\cache" }
+$BootstrapDir = if ($env:MCP_BOOTSTRAP_BOOTSTRAP_DIR) { $env:MCP_BOOTSTRAP_BOOTSTRAP_DIR } else { Join-Path $env:USERPROFILE ".mcp\bootstrap" }
+$LogFile = Join-Path $BootstrapDir "bootstrap.log"
+$UvCacheDir = Join-Path $CacheDir "uv"
 
 # Logging functions
 function Write-Log {
@@ -191,7 +191,7 @@ function Install-UvWithRetry {
             $installer | Invoke-Expression
 
             # Add to PATH for current session
-            $uvPath = "$env:USERPROFILE\.cargo\bin"
+            $uvPath = Join-Path $env:USERPROFILE ".cargo\bin"
             if ($env:PATH -notlike "*$uvPath*") {
                 $env:PATH = "$uvPath;$env:PATH"
             }
@@ -240,7 +240,7 @@ function Test-PackageExists {
         $response = Invoke-RestMethod -Uri $url -TimeoutSec 10 -UseBasicParsing
 
         if ($response.info.name) {
-            Write-Log "✓ Package found: $($response.info.name) $($response.info.version)"
+            Write-Log "Package found: $($response.info.name) $($response.info.version)"
             return $true
         }
     } catch {
@@ -293,7 +293,7 @@ function Test-PackageSpec {
 
 # Check environment freshness
 function Test-EnvironmentFreshness {
-    $lastCheckFile = "$BootstrapDir\last_env_check"
+    $lastCheckFile = Join-Path $BootstrapDir "last_env_check"
     $checkIntervalHours = 24
 
     if (Test-Path $lastCheckFile) {
@@ -325,7 +325,7 @@ function Start-ServerMonitored {
     Write-Log "Starting monitored MCP server: $PackageSpec"
 
     # Ensure PATH includes uv
-    $uvPath = "$env:USERPROFILE\.cargo\bin"
+    $uvPath = Join-Path $env:USERPROFILE ".cargo\bin"
     if ($env:PATH -notlike "*$uvPath*") {
         $env:PATH = "$uvPath;$env:PATH"
     }
@@ -334,7 +334,7 @@ function Start-ServerMonitored {
     $env:UV_CACHE_DIR = $UvCacheDir
 
     # Create startup marker
-    $startupMarker = "$BootstrapDir\server_startup_$PID"
+    $startupMarker = Join-Path $BootstrapDir "server_startup_$PID"
     (Get-Date).ToFileTime() | Set-Content $startupMarker
 
     # Cleanup function
@@ -410,7 +410,7 @@ function Main {
             Install-UvWithRetry
         } else {
             Write-Log "uv found, uvx should be available"
-            $uvPath = "$env:USERPROFILE\.cargo\bin"
+            $uvPath = Join-Path $env:USERPROFILE ".cargo\bin"
             if ($env:PATH -notlike "*$uvPath*") {
                 $env:PATH = "$uvPath;$env:PATH"
             }
@@ -426,22 +426,20 @@ function Main {
 
 # Handle help and version
 if ($PackageSpec -eq "--help" -or $PackageSpec -eq "-h" -or $PackageSpec -eq "help") {
-    Write-Host @"
-Enhanced MCP Python Server Bootstrap (PowerShell) v$ScriptVersion
-
-This script will install uvx (if needed) and run a Python MCP server.
-
-USAGE: .\bootstrap.ps1 <package-spec> [server-args...]
-
-EXAMPLES:
-    .\bootstrap.ps1 mcp-server-filesystem
-    .\bootstrap.ps1 mcp-server-database==1.2.0 --config config.json
-
-ENVIRONMENT VARIABLES:
-    MCP_BOOTSTRAP_CACHE_DIR      Cache directory (default: %USERPROFILE%\.mcp\cache)
-    MCP_BOOTSTRAP_BOOTSTRAP_DIR  Bootstrap data directory (default: %USERPROFILE%\.mcp\bootstrap)
-
-"@
+    Write-Host "Enhanced MCP Python Server Bootstrap (PowerShell) v$ScriptVersion"
+    Write-Host ""
+    Write-Host "This script will install uvx (if needed) and run a Python MCP server."
+    Write-Host ""
+    Write-Host "USAGE: .\bootstrap.ps1 package-spec [server-args...]"
+    Write-Host ""
+    Write-Host "EXAMPLES:"
+    Write-Host "    .\bootstrap.ps1 mcp-server-filesystem"
+    Write-Host "    .\bootstrap.ps1 mcp-server-database==1.2.0 --config config.json"
+    Write-Host ""
+    Write-Host "ENVIRONMENT VARIABLES:"
+    Write-Host "    MCP_BOOTSTRAP_CACHE_DIR      Cache directory"
+    Write-Host "    MCP_BOOTSTRAP_BOOTSTRAP_DIR  Bootstrap data directory"
+    Write-Host ""
     exit 0
 }
 
