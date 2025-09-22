@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "internal-server": {
+      "command": "sh",
+      "args": [
+        "-c",
+        "export MCP_BOOTSTRAP_BASE_URL='https://internal.company.com/mcp-bootstrap'; export https_proxy='http://proxy.company.com:8080'; curl -sSL $MCP_BOOTSTRAP_BASE_URL/scripts/universal-bootstrap.sh | sh -s -- internal-mcp-server==1.0.0"
+      ]
+    },
+    "pypi-server": {
+      "command": "sh",
+      "args": [
+        "-c",
+        "export MCP_BOOTSTRAP_CACHE_DIR='/opt/mcp/cache'; curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-filesystem"
+      ]
+    }
+  }
+}
