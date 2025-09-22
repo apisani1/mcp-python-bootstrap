@@ -12,25 +12,46 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        shell: [bash, sh]
 
     steps:
     - uses: actions/checkout@v4
 
-    - name: Test script syntax
+    - name: Test bash scripts syntax
       run: |
-        ${{ matrix.shell }} -n scripts/universal-bootstrap.sh
-        ${{ matrix.shell }} -n scripts/bootstrap-bash.sh
-        ${{ matrix.shell }} -n scripts/bootstrap-posix.sh
+        bash -n scripts/universal-bootstrap.sh
+        bash -n scripts/bootstrap-bash.sh
 
-    - name: Test platform detection
+    - name: Test platform detection with bash
       run: |
-        ${{ matrix.shell }} scripts/universal-bootstrap.sh --version
+        bash scripts/universal-bootstrap.sh --version
 
     - name: Run integration tests
       run: |
         chmod +x tests/test-integration.sh
         ./tests/test-integration.sh
+
+  test-posix:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Test POSIX scripts syntax
+      run: |
+        sh -n scripts/universal-bootstrap.sh
+        sh -n scripts/bootstrap-posix.sh
+
+    - name: Test platform detection with POSIX shell
+      run: |
+        sh scripts/universal-bootstrap.sh --version
+
+    - name: Run POSIX-specific tests
+      run: |
+        chmod +x tests/test-posix.sh
+        ./tests/test-posix.sh
 
   test-powershell:
     runs-on: windows-latest
