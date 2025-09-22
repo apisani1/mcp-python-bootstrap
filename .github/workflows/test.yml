@@ -73,7 +73,7 @@ jobs:
       matrix:
         container:
           - alpine:latest
-          - debian:slim
+          - debian:bookworm-slim
           - ubuntu:latest
 
     container: ${{ matrix.container }}
