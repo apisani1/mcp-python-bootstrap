@@ -104,8 +104,29 @@ is_cache_fresh() {
     local cache_file="$1"
     local max_age_hours=24
 
+    # Force refresh if environment variable is set
+    if [ "${MCP_BOOTSTRAP_FORCE_REFRESH:-}" = "1" ]; then
+        log "Forcing cache refresh due to MCP_BOOTSTRAP_FORCE_REFRESH=1"
+        return 1
+    fi
+
     if [ ! -f "$cache_file" ]; then
         return 1
+    fi
+
+    # Check for critical bug fixes (force refresh for scripts without GitHub raw URL support)
+    if [ -f "$cache_file" ]; then
+        # Check if the cached script has GitHub raw URL support
+        if ! grep -q "https://raw.githubusercontent.com" "$cache_file" 2>/dev/null; then
+            log "Cache missing critical GitHub raw URL fixes - forcing refresh"
+            return 1
+        fi
+
+        # Check for SCRIPT_ARGS fixes
+        if grep -q 'SCRIPT_ARGS\[@\]' "$cache_file" 2>/dev/null && ! grep -q 'SCRIPT_ARGS\[@\]:-' "$cache_file" 2>/dev/null; then
+            log "Cache missing critical SCRIPT_ARGS fixes - forcing refresh"
+            return 1
+        fi
     fi
 
     if command -v stat >/dev/null 2>&1; then
