@@ -6,8 +6,8 @@
 set -eu
 
 SCRIPT_VERSION="1.2.0"
-BASE_URL="https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts"
-CACHE_DIR="${HOME}/.mcp/bootstrap-cache"
+BASE_URL="${MCP_BOOTSTRAP_BASE_URL:-https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts}"
+CACHE_DIR="${MCP_BOOTSTRAP_CACHE_DIR:-${HOME}/.mcp/bootstrap-cache}"
 LOG_FILE="${HOME}/.mcp/bootstrap.log"
 
 # Colors (if supported)
@@ -241,7 +241,7 @@ This script will:
 3. Install uvx (via uv) if not available
 4. Use uvx to run the specified Python MCP server
 
-For more information: https://github.com/mcp-tools/python-bootstrap
+For more information: https://github.com/apisani1/mcp-python-bootstrap
 EOF
 }
 
@@ -260,15 +260,7 @@ main() {
 
     log "MCP Python Server Bootstrap v$SCRIPT_VERSION starting"
 
-    # Override cache directory if specified
-    if [ -n "${MCP_BOOTSTRAP_CACHE_DIR:-}" ]; then
-        CACHE_DIR="$MCP_BOOTSTRAP_CACHE_DIR"
-    fi
-
-    # Override base URL if specified
-    if [ -n "${MCP_BOOTSTRAP_BASE_URL:-}" ]; then
-        BASE_URL="$MCP_BOOTSTRAP_BASE_URL"
-    fi
+    # Environment variables are handled at script initialization
 
     create_cache_dir
 

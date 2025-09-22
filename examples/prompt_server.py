@@ -1,37 +1,12 @@
 import base64
 import mimetypes
-from typing import (
-    List,
-    Optional,
-)
+from typing import List, Optional
 
 from mcp.server.fastmcp import FastMCP
-from mcp.server.fastmcp.prompts.base import (
-    AssistantMessage,
-    Message,
-    UserMessage,
-)
-from mcp.types import (
-    AudioContent,
-    BlobResourceContents,
-    EmbeddedResource,
-    ImageContent,
-    ResourceLink,
-    TextContent,
-)
+from mcp.server.fastmcp.prompts.base import AssistantMessage, Message, UserMessage
+from mcp.types import AudioContent, BlobResourceContents, EmbeddedResource, ImageContent, ResourceLink, TextContent
 
-
-try:
-    from .media_handler import (
-        get_audio,
-        get_image,
-    )
-except ImportError:
-    from src.mcp_masterclass.media_handler import (
-        get_audio,
-        get_image,
-    )
-
+from .media_handler import get_audio, get_image
 
 mcp = FastMCP("My Prompts")
 

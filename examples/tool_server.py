@@ -1,36 +1,12 @@
 """Example showing structured input and output with tools."""
 
-from typing import (
-    Dict,
-    List,
-    Optional,
-    TypedDict,
-)
-
-from pydantic import (
-    BaseModel,
-    Field,
-)
+from typing import Dict, List, Optional, TypedDict
 
 from mcp.server.fastmcp import FastMCP
-from mcp.types import (
-    AudioContent,
-    CallToolResult,
-    ImageContent,
-)
+from mcp.types import AudioContent, CallToolResult, ImageContent
+from pydantic import BaseModel, Field
 
-
-try:
-    from .media_handler import (
-        get_audio,
-        get_image,
-    )
-except ImportError:
-    from src.mcp_masterclass.media_handler import (
-        get_audio,
-        get_image,
-    )
-
+from .media_handler import get_audio, get_image
 
 # Create server
 mcp = FastMCP("My Tools")

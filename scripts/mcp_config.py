@@ -23,6 +23,8 @@ def detect_package_type(package_spec: str) -> str:
     """Detect the type of package specification."""
     if package_spec.startswith("git+"):
         return "git"
+    elif package_spec.startswith(("https://github.com/", "http://github.com/", "https://gitlab.com/", "https://bitbucket.org/")):
+        return "github_raw"
     elif package_spec.startswith(("/", "./", "../")) or package_spec.startswith("-e"):
         return "local"
     else:
@@ -44,13 +46,24 @@ def extract_server_name(package_spec: str, filepath: Optional[Path] = None) -> O
             print(f"Warning: Could not read file {filepath}: {e}")
 
     # Fallback: derive from package spec
-    if detect_package_type(package_spec) == "pypi":
+    package_type = detect_package_type(package_spec)
+
+    if package_type == "pypi":
         # Extract package name from PyPI spec (remove version constraints)
         name = re.split(r'[><=!~]', package_spec.split('[')[0])[0]
         return name.replace('-', '_').replace('_', '-')
-    elif package_spec.startswith("git+"):
+    elif package_type == "git":
         # Extract from git URL
         match = re.search(r'/([^/]+?)(?:\.git)?(?:#.*)?$', package_spec)
+        if match:
+            return match.group(1)
+    elif package_type == "github_raw":
+        # Extract from GitHub raw URL (e.g., filename without .py)
+        match = re.search(r'/([^/]+?)\.py$', package_spec)
+        if match:
+            return match.group(1).replace('_', '-')
+        # Fallback: extract repository name
+        match = re.search(r'/([^/]+?)/[^/]+?/[^/]+?/', package_spec)
         if match:
             return match.group(1)
     elif "/" in package_spec:
@@ -86,7 +99,8 @@ def create_or_update_config(
     server_name: str,
     package_spec: str,
     config_file: Path,
-    server_args: Optional[List[str]] = None
+    server_args: Optional[List[str]] = None,
+    bootstrap_url: str = "https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh"
 ) -> bool:
     """Create or update the MCP configuration file using bootstrap script."""
     try:
@@ -103,19 +117,42 @@ def create_or_update_config(
         if "mcpServers" not in config_data:
             config_data["mcpServers"] = {}
 
-        # Get bootstrap script path
-        bootstrap_script = get_bootstrap_script_path()
+        # Build configuration based on package type
+        package_type = detect_package_type(package_spec)
 
-        # Build command arguments
-        args = [str(bootstrap_script), package_spec]
-        if server_args:
-            args.extend(server_args)
+        if package_type == "github_raw":
+            # For GitHub raw URLs, convert to proper format and use remote bootstrap
+            # Convert GitHub blob URLs to raw URLs if needed
+            if "/blob/" in package_spec:
+                raw_url = package_spec.replace("/blob/", "/raw/")
+            else:
+                raw_url = package_spec
 
-        # Create server configuration using bootstrap script
-        config_data["mcpServers"][server_name] = {
-            "command": "bash",
-            "args": args
-        }
+            # Create remote bootstrap configuration
+            bootstrap_cmd = f"curl -sSL {bootstrap_url} | sh -s --"
+            if server_args:
+                server_args_str = " " + " ".join(f'"{arg}"' for arg in server_args)
+            else:
+                server_args_str = ""
+
+            config_data["mcpServers"][server_name] = {
+                "command": "sh",
+                "args": [
+                    "-c",
+                    f'{bootstrap_cmd} "{raw_url}"{server_args_str}'
+                ]
+            }
+        else:
+            # For local/PyPI/git packages, use local bootstrap script
+            bootstrap_script = get_bootstrap_script_path()
+            args = [str(bootstrap_script), package_spec]
+            if server_args:
+                args.extend(server_args)
+
+            config_data["mcpServers"][server_name] = {
+                "command": "bash",
+                "args": args
+            }
 
         # Add comment/metadata for better understanding
         if server_name not in config_data["mcpServers"] or "_metadata" not in config_data["mcpServers"][server_name]:
@@ -158,12 +195,14 @@ def print_usage():
     print("  --name NAME         Server name (auto-detected if not provided)")
     print("  --config FILE       Config file path (default: Claude desktop config)")
     print("  --args ARGS         Additional server arguments (comma-separated)")
+    print("  --bootstrap-url URL Bootstrap script URL (default: apisani1/mcp-python-bootstrap)")
     print("  --help, -h          Show this help message")
     print("")
     print("Examples:")
     print("  python3 mcp_config.py mcp-server-filesystem")
     print("  python3 mcp_config.py ./src/my_server.py --name my-server")
     print("  python3 mcp_config.py mcp-server-database==1.2.0 --args '--db-path,/tmp/db.sqlite'")
+    print("  python3 mcp_config.py https://github.com/user/repo/blob/main/server.py --bootstrap-url https://example.com/bootstrap.sh")
 
 
 def parse_args():
@@ -177,6 +216,7 @@ def parse_args():
     server_name = None
     config_file_name = None
     server_args = []
+    bootstrap_url = "https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh"
 
     i = 1
     while i < len(args):
@@ -189,6 +229,9 @@ def parse_args():
         elif args[i] == "--args" and i + 1 < len(args):
             server_args = args[i + 1].split(',')
             i += 2
+        elif args[i] == "--bootstrap-url" and i + 1 < len(args):
+            bootstrap_url = args[i + 1]
+            i += 2
         else:
             print(f"Unknown argument: {args[i]}")
             sys.exit(1)
@@ -199,12 +242,12 @@ def parse_args():
             "~/Library/Application Support/Claude/claude_desktop_config.json"
         )
 
-    return package_spec, server_name, config_file_name, server_args
+    return package_spec, server_name, config_file_name, server_args, bootstrap_url
 
 
 def main() -> None:
     """Main function to handle command line arguments and execute the script."""
-    package_spec, server_name, config_file_name, server_args = parse_args()
+    package_spec, server_name, config_file_name, server_args, bootstrap_url = parse_args()
 
     # Auto-detect server name if not provided
     if not server_name:
@@ -242,7 +285,7 @@ def main() -> None:
 
     # Create or update config file
     config_file = Path(config_file_name)
-    if create_or_update_config(server_name, package_spec, config_file, server_args):
+    if create_or_update_config(server_name, package_spec, config_file, server_args, bootstrap_url):
         package_type = detect_package_type(package_spec)
         print(f"✅ Added MCP server configuration:")
         print(f"   Name: {server_name}")
@@ -251,7 +294,10 @@ def main() -> None:
         if server_args:
             print(f"   Args: {', '.join(server_args)}")
         print(f"   Config: {config_file}")
-        print(f"   Bootstrap: {bootstrap_script}")
+        if package_type == "github_raw":
+            print(f"   Bootstrap: {bootstrap_url}")
+        else:
+            print(f"   Bootstrap: {bootstrap_script}")
     else:
         sys.exit(1)
 

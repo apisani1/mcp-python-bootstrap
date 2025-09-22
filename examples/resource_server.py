@@ -4,28 +4,15 @@ from uuid import UUID
 
 from mcp.server.fastmcp import FastMCP
 
-
-try:
-    from .inventory_db import (
-        DatabaseSchema,
-        EnrichedInventoryItem,
-        InventoryOverview,
-        InventoryStatistics,
-        ItemCategory,
-        ItemStatus,
-        db,
-    )
-except ImportError:
-    from src.mcp_masterclass.inventory_db import (
-        DatabaseSchema,
-        EnrichedInventoryItem,
-        InventoryOverview,
-        InventoryStatistics,
-        ItemCategory,
-        ItemStatus,
-        db,
-    )
-
+from .inventory_db import (
+    DatabaseSchema,
+    EnrichedInventoryItem,
+    InventoryOverview,
+    InventoryStatistics,
+    ItemCategory,
+    ItemStatus,
+    db,
+)
 
 mcp = FastMCP("Inventory Management")
 
