@@ -6,7 +6,24 @@
 set -eu
 
 SCRIPT_VERSION="1.2.0"
-PACKAGE_SPEC="${1:-}"
+
+# Parse arguments to handle --from syntax (POSIX-compliant)
+if [ "${1:-}" = "--from" ] && [ $# -ge 3 ]; then
+    # --from package_name executable_name [additional_args...]
+    PACKAGE_SPEC="$2"
+    EXECUTABLE_NAME="$3"
+    shift 3
+    USE_FROM_SYNTAX="true"
+else
+    # Regular syntax: package_name [args...]
+    PACKAGE_SPEC="${1:-}"
+    EXECUTABLE_NAME=""
+    shift 1
+    USE_FROM_SYNTAX="false"
+fi
+
+# Store remaining arguments
+SCRIPT_ARGS="$*"
 
 # Configuration
 CACHE_DIR="${MCP_BOOTSTRAP_CACHE_DIR:-$HOME/.mcp/cache}"
@@ -202,8 +219,15 @@ run_server() {
         fi
     else
         # For PyPI/git packages, use uvx
-        log "Executing: uvx $PACKAGE_SPEC $*"
-        exec uvx "$PACKAGE_SPEC" "$@"
+        if [ "$USE_FROM_SYNTAX" = "true" ]; then
+            # Use --from syntax: uvx --from package_name executable_name [args...]
+            log "Executing: uvx --from $PACKAGE_SPEC $EXECUTABLE_NAME $SCRIPT_ARGS"
+            exec uvx --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" $SCRIPT_ARGS
+        else
+            # Regular uvx syntax
+            log "Executing: uvx $PACKAGE_SPEC $SCRIPT_ARGS"
+            exec uvx "$PACKAGE_SPEC" $SCRIPT_ARGS
+        fi
     fi
 }
 

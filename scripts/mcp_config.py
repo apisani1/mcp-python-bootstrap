@@ -73,6 +73,32 @@ def extract_server_name(package_spec: str, filepath: Optional[Path] = None) -> O
     return package_spec
 
 
+def detect_executable_name(package_spec: str) -> Optional[str]:
+    """Detect the likely executable name from package specification."""
+    package_type = detect_package_type(package_spec)
+
+    if package_type == "pypi" or package_type == "git":
+        # Use package_spec for pattern matching, not server_name
+        package_name = package_spec.split('=')[0].split('[')[0]  # Remove version constraints
+
+        # Common patterns for executable names
+        # Pattern 1: test-mcp-server-ap25092201 -> test-mcp-server
+        if re.match(r'^(.+)-[a-z]{2}\d{11}$', package_name):
+            base_name = re.sub(r'-[a-z]{2}\d{11}$', '', package_name)
+            return base_name
+
+        # Pattern 2: mcp-server-filesystem -> mcp-server-filesystem (same)
+        # Pattern 3: package-name-with-suffix -> package-name
+        if '-' in package_name and len(package_name.split('-')) > 2:
+            parts = package_name.split('-')
+            # Try removing the last part if it looks like a suffix
+            if len(parts[-1]) <= 4 or parts[-1].isdigit() or re.match(r'^[a-z]{2}\d+$', parts[-1]):
+                return '-'.join(parts[:-1])
+
+    # Default: assume executable name matches package name
+    return None
+
+
 def get_bootstrap_script_path() -> Path:
     """Get the path to the universal bootstrap script."""
     # Look for bootstrap script relative to this script
@@ -100,7 +126,8 @@ def create_or_update_config(
     package_spec: str,
     config_file: Path,
     server_args: Optional[List[str]] = None,
-    bootstrap_url: str = "https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh"
+    bootstrap_url: str = "https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh",
+    executable_name: Optional[str] = None
 ) -> bool:
     """Create or update the MCP configuration file using bootstrap script."""
     try:
@@ -146,7 +173,24 @@ def create_or_update_config(
         else:
             # For local/PyPI/git packages, use local bootstrap script
             bootstrap_script = get_bootstrap_script_path()
-            args = [str(bootstrap_script), package_spec]
+
+            # Detect if we need --from syntax for uvx
+            package_type = detect_package_type(package_spec)
+            if executable_name or (package_type in ["pypi", "git"] and executable_name != server_name):
+                # Auto-detect executable name if not provided
+                if not executable_name:
+                    executable_name = detect_executable_name(package_spec)
+
+                if executable_name and executable_name != server_name:
+                    # Use --from syntax: ["bootstrap.sh", "--from", "package", "executable"]
+                    args = [str(bootstrap_script), "--from", package_spec, executable_name]
+                else:
+                    # Regular syntax
+                    args = [str(bootstrap_script), package_spec]
+            else:
+                # Regular syntax
+                args = [str(bootstrap_script), package_spec]
+
             if server_args:
                 args.extend(server_args)
 
@@ -196,6 +240,7 @@ def print_usage():
     print("  --name NAME         Server name (auto-detected if not provided)")
     print("  --config FILE       Config file path (default: Claude desktop config)")
     print("  --args ARGS         Additional server arguments (comma-separated)")
+    print("  --executable NAME   Executable name if different from package name")
     print("  --bootstrap-url URL Bootstrap script URL (default: apisani1/mcp-python-bootstrap)")
     print("  --help, -h          Show this help message")
     print("")
@@ -203,6 +248,7 @@ def print_usage():
     print("  python3 mcp_config.py mcp-server-filesystem")
     print("  python3 mcp_config.py ./src/my_server.py --name my-server")
     print("  python3 mcp_config.py mcp-server-database==1.2.0 --args '--db-path,/tmp/db.sqlite'")
+    print("  python3 mcp_config.py test-mcp-server-ap25092201 --executable test-mcp-server")
     print("  python3 mcp_config.py https://github.com/user/repo/blob/main/server.py --bootstrap-url https://example.com/bootstrap.sh")
 
 
@@ -218,6 +264,7 @@ def parse_args():
     config_file_name = None
     server_args = []
     bootstrap_url = "https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh"
+    executable_name = None
 
     i = 1
     while i < len(args):
@@ -233,6 +280,9 @@ def parse_args():
         elif args[i] == "--bootstrap-url" and i + 1 < len(args):
             bootstrap_url = args[i + 1]
             i += 2
+        elif args[i] == "--executable" and i + 1 < len(args):
+            executable_name = args[i + 1]
+            i += 2
         else:
             print(f"Unknown argument: {args[i]}")
             sys.exit(1)
@@ -243,12 +293,12 @@ def parse_args():
             "~/Library/Application Support/Claude/claude_desktop_config.json"
         )
 
-    return package_spec, server_name, config_file_name, server_args, bootstrap_url
+    return package_spec, server_name, config_file_name, server_args, bootstrap_url, executable_name
 
 
 def main() -> None:
     """Main function to handle command line arguments and execute the script."""
-    package_spec, server_name, config_file_name, server_args, bootstrap_url = parse_args()
+    package_spec, server_name, config_file_name, server_args, bootstrap_url, executable_name = parse_args()
 
     # Auto-detect server name if not provided
     if not server_name:
@@ -286,7 +336,7 @@ def main() -> None:
 
     # Create or update config file
     config_file = Path(config_file_name)
-    if create_or_update_config(server_name, package_spec, config_file, server_args, bootstrap_url):
+    if create_or_update_config(server_name, package_spec, config_file, server_args, bootstrap_url, executable_name):
         package_type = detect_package_type(package_spec)
         print(f"✅ Added MCP server configuration:")
         print(f"   Name: {server_name}")

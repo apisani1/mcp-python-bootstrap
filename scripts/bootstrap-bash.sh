@@ -6,8 +6,21 @@
 set -euo pipefail
 
 SCRIPT_VERSION="1.2.0"
-PACKAGE_SPEC="${1:-}"
-SCRIPT_ARGS=("${@:2}")
+
+# Parse arguments to handle --from syntax
+if [[ "${1:-}" == "--from" ]] && [[ $# -ge 3 ]]; then
+    # --from package_name executable_name [additional_args...]
+    PACKAGE_SPEC="$2"
+    EXECUTABLE_NAME="$3"
+    SCRIPT_ARGS=("${@:4}")
+    USE_FROM_SYNTAX=true
+else
+    # Regular syntax: package_name [args...]
+    PACKAGE_SPEC="${1:-}"
+    EXECUTABLE_NAME=""
+    SCRIPT_ARGS=("${@:2}")
+    USE_FROM_SYNTAX=false
+fi
 
 # Configuration
 CACHE_DIR="${MCP_BOOTSTRAP_CACHE_DIR:-$HOME/.mcp/cache}"
@@ -469,11 +482,24 @@ run_server_monitored() {
         fi
     else
         # For PyPI/git packages, use uvx
-        if uvx "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"; then
-            success "Server exited normally"
+        if [[ "$USE_FROM_SYNTAX" == "true" ]]; then
+            # Use --from syntax: uvx --from package_name executable_name [args...]
+            log "Executing: uvx --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
+            if uvx --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"; then
+                success "Server exited normally"
+            else
+                local exit_code=$?
+                error "Server exited with code $exit_code"
+            fi
         else
-            local exit_code=$?
-            error "Server exited with code $exit_code"
+            # Regular uvx syntax
+            log "Executing: uvx $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
+            if uvx "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"; then
+                success "Server exited normally"
+            else
+                local exit_code=$?
+                error "Server exited with code $exit_code"
+            fi
         fi
     fi
 
