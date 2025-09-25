@@ -45,3 +45,4 @@ ENV/
 .DS_Store
 *.pkl
 *.pickle
+CLAUDE.md

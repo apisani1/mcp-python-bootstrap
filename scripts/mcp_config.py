@@ -78,8 +78,13 @@ def detect_executable_name(package_spec: str) -> Optional[str]:
     package_type = detect_package_type(package_spec)
 
     if package_type == "pypi" or package_type == "git":
-        # Use package_spec for pattern matching, not server_name
-        package_name = package_spec.split('=')[0].split('[')[0]  # Remove version constraints
+        # For git packages, extract the actual package name from the URL first
+        if package_type == "git":
+            server_name = extract_server_name(package_spec)
+            package_name = server_name
+        else:
+            # For PyPI packages, use the package spec directly
+            package_name = package_spec.split('=')[0].split('[')[0]  # Remove version constraints
 
         # Common patterns for executable names
         # Pattern 1: test-mcp-server-ap25092201 -> test-mcp-server
@@ -170,12 +175,11 @@ def create_or_update_config(
                     f'{bootstrap_cmd} "{raw_url}"{server_args_str}'
                 ]
             }
-        else:
-            # For local/PyPI/git packages, use local bootstrap script
+        elif package_type == "local":
+            # For local packages only, use local bootstrap script
             bootstrap_script = get_bootstrap_script_path()
 
             # Detect if we need --from syntax for uvx
-            package_type = detect_package_type(package_spec)
             if executable_name or (package_type in ["pypi", "git"] and executable_name != server_name):
                 # Auto-detect executable name if not provided
                 if not executable_name:
@@ -197,6 +201,39 @@ def create_or_update_config(
             config_data["mcpServers"][server_name] = {
                 "command": "bash",
                 "args": args
+            }
+        else:
+            # For PyPI and git packages, use remote bootstrap with curl
+            bootstrap_cmd = f"curl -sSL {bootstrap_url} | sh -s --"
+
+            # Detect if we need --from syntax for uvx
+            if executable_name or (package_type in ["pypi", "git"] and executable_name != server_name):
+                # Auto-detect executable name if not provided
+                if not executable_name:
+                    executable_name = detect_executable_name(package_spec)
+
+                if executable_name and executable_name != server_name:
+                    # Use --from syntax with remote bootstrap
+                    cmd_args = f'--from "{package_spec}" "{executable_name}"'
+                else:
+                    # Regular syntax
+                    cmd_args = f'"{package_spec}"'
+            else:
+                # Regular syntax
+                cmd_args = f'"{package_spec}"'
+
+            # Add server arguments if provided
+            if server_args:
+                server_args_str = " " + " ".join(f'"{arg}"' for arg in server_args)
+            else:
+                server_args_str = ""
+
+            config_data["mcpServers"][server_name] = {
+                "command": "sh",
+                "args": [
+                    "-c",
+                    f'{bootstrap_cmd} {cmd_args}{server_args_str}'
+                ]
             }
 
         # Add comment/metadata for better understanding
