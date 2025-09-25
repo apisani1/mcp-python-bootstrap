@@ -419,12 +419,12 @@ run_server_monitored() {
     export UV_CACHE_DIR="$UV_CACHE_DIR"
 
     # Create startup marker
-    local startup_marker="$BOOTSTRAP_DIR/server_startup_$$"
-    echo "$(date +%s)" > "$startup_marker"
+    STARTUP_MARKER="$BOOTSTRAP_DIR/server_startup_$$"
+    echo "$(date +%s)" > "$STARTUP_MARKER"
 
     # Cleanup function
     cleanup() {
-        rm -f "$startup_marker"
+        rm -f "$STARTUP_MARKER" 2>/dev/null || true
         log "Server cleanup completed"
     }
     trap cleanup EXIT INT TERM
@@ -435,7 +435,7 @@ run_server_monitored() {
     # Start the server with timeout monitoring
     (
         sleep 30
-        if [[ -f "$startup_marker" ]]; then
+        if [[ -f "$STARTUP_MARKER" ]]; then
             warn "Server startup taking longer than expected (30s)"
         fi
     ) &
