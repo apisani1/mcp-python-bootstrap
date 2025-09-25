@@ -285,7 +285,12 @@ main() {
 
     create_cache_dir
 
-    validate_package_spec "$1"
+    # Handle --from syntax for package specification validation
+    if [ "${1:-}" = "--from" ] && [ $# -ge 3 ]; then
+        validate_package_spec "$2"
+    else
+        validate_package_spec "$1"
+    fi
 
     local platform
     platform=$(detect_platform)
