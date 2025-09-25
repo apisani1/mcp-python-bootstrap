@@ -131,7 +131,7 @@ def create_or_update_config(
     package_spec: str,
     config_file: Path,
     server_args: Optional[List[str]] = None,
-    bootstrap_url: str = "https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/85dcc7edf862a29acf7700b2019dedeff62128e1/scripts/universal-bootstrap.sh",
+    bootstrap_url: str = "https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/540d3de975dcfba61c47de0b9476ba84e1399054/scripts/universal-bootstrap.sh",
     executable_name: Optional[str] = None
 ) -> bool:
     """Create or update the MCP configuration file using bootstrap script."""
@@ -300,7 +300,7 @@ def parse_args():
     server_name = None
     config_file_name = None
     server_args = []
-    bootstrap_url = "https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/85dcc7edf862a29acf7700b2019dedeff62128e1/scripts/universal-bootstrap.sh"
+    bootstrap_url = "https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/540d3de975dcfba61c47de0b9476ba84e1399054/scripts/universal-bootstrap.sh"
     executable_name = None
 
     i = 1
