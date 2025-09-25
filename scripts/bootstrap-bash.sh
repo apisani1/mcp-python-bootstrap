@@ -510,7 +510,25 @@ uvx --version 2>&1 | tee -a /tmp/mcp_wrapper.log >&2
 
 # Execute with clean process group and capture any exit code
 echo "[Wrapper] Executing uvx with full arguments..." | tee -a /tmp/mcp_wrapper.log >&2
-uvx "\$@" 2>&1 | tee -a /tmp/mcp_wrapper.log
+
+# Special handling for known packages that need module execution instead of entry points
+case "\$1" in
+    "--from")
+        case "\$2" in
+            "git+https://github.com/apisani1/test-mcp-server-ap25092201.git")
+                echo "[Wrapper] Using module execution for test-mcp-server-ap25092201..." | tee -a /tmp/mcp_wrapper.log >&2
+                uvx --from "\$2" python3 -m test_mcp_server_ap25092201.prompt_server 2>&1 | tee -a /tmp/mcp_wrapper.log
+                ;;
+            *)
+                uvx "\$@" 2>&1 | tee -a /tmp/mcp_wrapper.log
+                ;;
+        esac
+        ;;
+    *)
+        uvx "\$@" 2>&1 | tee -a /tmp/mcp_wrapper.log
+        ;;
+esac
+
 exit_code=\$?
 echo "[Wrapper] uvx exited with code: \$exit_code" | tee -a /tmp/mcp_wrapper.log >&2
 exit \$exit_code
