@@ -410,6 +410,43 @@ check_environment_freshness() {
     echo "$(date +%s)" > "$last_check_file"
 }
 
+# Direct server execution for MCP servers (no monitoring)
+run_server_direct() {
+    log "Starting MCP server (direct execution): $PACKAGE_SPEC"
+
+    # Ensure PATH includes uv
+    setup_uv_path
+    export UV_CACHE_DIR="$UV_CACHE_DIR"
+
+    # Direct execution without monitoring - essential for MCP stdio communication
+    local package_type
+    package_type=$(detect_package_type "$PACKAGE_SPEC")
+
+    if [[ "$package_type" == "github_raw" ]]; then
+        # For GitHub raw URLs, download and execute directly with Python
+        local temp_file="/tmp/mcp_server_$$.py"
+        if command_exists curl; then
+            if curl -sSfL "$PACKAGE_SPEC" -o "$temp_file"; then
+                log "Downloaded $PACKAGE_SPEC, executing directly"
+                exec python3 "$temp_file" $SCRIPT_ARGS
+            else
+                error "Failed to download $PACKAGE_SPEC"
+            fi
+        else
+            error "curl is required to download GitHub raw URLs"
+        fi
+    else
+        # For PyPI/git packages, use uvx with direct exec
+        if [[ "$USE_FROM_SYNTAX" == "true" ]]; then
+            log "Executing directly: uvx --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
+            exec uvx --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"
+        else
+            log "Executing directly: uvx $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
+            exec uvx "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
+        fi
+    fi
+}
+
 # Enhanced server execution with monitoring
 run_server_monitored() {
     log "Starting monitored MCP server: $PACKAGE_SPEC"
@@ -541,8 +578,8 @@ main() {
         success "uvx installation verified successfully"
     fi
 
-    # Run the server
-    run_server_monitored
+    # Run the server (use direct execution for clean MCP stdio communication)
+    run_server_direct
 }
 
 # Handle help and version
