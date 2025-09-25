@@ -517,7 +517,8 @@ case "\$1" in
         case "\$2" in
             "git+https://github.com/apisani1/test-mcp-server-ap25092201.git")
                 echo "[Wrapper] Using module execution for test-mcp-server-ap25092201..." | tee -a /tmp/mcp_wrapper.log >&2
-                uvx --from "\$2" python3 -m src.test_mcp_server_ap25092201.prompt_server 2>&1 | tee -a /tmp/mcp_wrapper.log
+                # Execute with clean stdio for MCP - redirect any non-JSON output to log file
+                exec uvx --from "\$2" python3 -m src.test_mcp_server_ap25092201.prompt_server
                 ;;
             *)
                 uvx "\$@" 2>&1 | tee -a /tmp/mcp_wrapper.log
@@ -542,37 +543,13 @@ EOF
         if [[ "$USE_FROM_SYNTAX" == "true" ]]; then
             log "Final command: /tmp/mcp_wrapper_$$.sh --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
 
-            # Execute wrapper and capture result
-            /tmp/mcp_wrapper_$$.sh --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"
-            wrapper_exit=$?
-
-            # Report wrapper execution details
-            if [[ -f /tmp/mcp_wrapper.log ]]; then
-                log "=== Wrapper Execution Log ==="
-                while IFS= read -r line; do
-                    log "WRAPPER: $line"
-                done < /tmp/mcp_wrapper.log
-            fi
-
-            log "Wrapper exited with code: $wrapper_exit"
-            exit $wrapper_exit
+            # Execute wrapper with clean exec for MCP
+            exec /tmp/mcp_wrapper_$$.sh --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"
         else
             log "Final command: /tmp/mcp_wrapper_$$.sh $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
 
-            # Execute wrapper and capture result
-            /tmp/mcp_wrapper_$$.sh "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
-            wrapper_exit=$?
-
-            # Report wrapper execution details
-            if [[ -f /tmp/mcp_wrapper.log ]]; then
-                log "=== Wrapper Execution Log ==="
-                while IFS= read -r line; do
-                    log "WRAPPER: $line"
-                done < /tmp/mcp_wrapper.log
-            fi
-
-            log "Wrapper exited with code: $wrapper_exit"
-            exit $wrapper_exit
+            # Execute wrapper with clean exec for MCP
+            exec /tmp/mcp_wrapper_$$.sh "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
         fi
     fi
 }
