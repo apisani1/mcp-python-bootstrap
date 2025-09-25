@@ -187,11 +187,11 @@ install_uv_with_retry() {
         export UV_CACHE_DIR="$UV_CACHE_DIR"
 
         if command_exists curl; then
-            if curl -LsSf https://astral.sh/uv/install.sh | sh -s -- --no-modify-path; then
+            if curl -LsSf https://astral.sh/uv/install.sh | sh -s -- --no-modify-path >&2; then
                 break
             fi
         elif command_exists wget; then
-            if wget -qO- https://astral.sh/uv/install.sh | sh -s -- --no-modify-path; then
+            if wget -qO- https://astral.sh/uv/install.sh | sh -s -- --no-modify-path >&2; then
                 break
             fi
         else
@@ -428,9 +428,6 @@ run_server_monitored() {
         log "Server cleanup completed"
     }
     trap cleanup EXIT INT TERM
-
-    # Log the command being executed
-    log "Executing: uvx $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
 
     # Start the server with timeout monitoring
     (
