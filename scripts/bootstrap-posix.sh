@@ -7,6 +7,29 @@ set -eu
 
 SCRIPT_VERSION="1.2.0"
 
+# Handle help and version first
+case "${1:-}" in
+    --help|-h|help)
+        cat << EOF
+POSIX MCP Python Server Bootstrap v$SCRIPT_VERSION
+
+USAGE: $0 <package-spec> [server-args...]
+
+This is the POSIX-compliant version for minimal environments.
+
+EXAMPLES:
+    $0 mcp-server-filesystem
+    $0 mcp-server-database==1.2.0
+
+EOF
+        exit 0
+        ;;
+    --version|-v)
+        echo "$SCRIPT_VERSION"
+        exit 0
+        ;;
+esac
+
 # Parse arguments to handle --from syntax (POSIX-compliant)
 if [ "${1:-}" = "--from" ] && [ $# -ge 3 ]; then
     # --from package_name executable_name [additional_args...]
@@ -209,8 +232,8 @@ run_server() {
         if command -v curl >/dev/null 2>&1; then
             if curl -sSfL "$PACKAGE_SPEC" -o "$temp_file"; then
                 log "Downloaded $PACKAGE_SPEC to $temp_file"
-                log "Executing: python3 $temp_file $*"
-                exec python3 "$temp_file" "$@"
+                log "Executing: python3 $temp_file $SCRIPT_ARGS"
+                exec python3 "$temp_file" $SCRIPT_ARGS
             else
                 error "Failed to download $PACKAGE_SPEC"
             fi
@@ -255,33 +278,9 @@ main() {
         success "uvx installation verified successfully"
     fi
 
-    # Run the server (shift to remove package spec, pass remaining args)
-    shift
-    run_server "$@"
+    # Run the server (pass remaining args)
+    run_server
 }
-
-# Handle help
-case "${1:-}" in
-    --help|-h|help)
-        cat << EOF
-POSIX MCP Python Server Bootstrap v$SCRIPT_VERSION
-
-USAGE: $0 <package-spec> [server-args...]
-
-This is the POSIX-compliant version for minimal environments.
-
-EXAMPLES:
-    $0 mcp-server-filesystem
-    $0 mcp-server-database==1.2.0
-
-EOF
-        exit 0
-        ;;
-    --version|-v)
-        echo "$SCRIPT_VERSION"
-        exit 0
-        ;;
-esac
 
 # Run main
 main "$@"
