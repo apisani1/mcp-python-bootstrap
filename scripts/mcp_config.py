@@ -131,7 +131,7 @@ def create_or_update_config(
     package_spec: str,
     config_file: Path,
     server_args: Optional[List[str]] = None,
-    bootstrap_url: str = "https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh",
+    bootstrap_url: str = "https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/85dcc7edf862a29acf7700b2019dedeff62128e1/scripts/universal-bootstrap.sh",
     executable_name: Optional[str] = None
 ) -> bool:
     """Create or update the MCP configuration file using bootstrap script."""
@@ -164,7 +164,7 @@ def create_or_update_config(
             # Create remote bootstrap configuration
             bootstrap_cmd = f"curl -sSL {bootstrap_url} | sh -s --"
             if server_args:
-                server_args_str = " " + " ".join(f'"{arg}"' for arg in server_args)
+                server_args_str = " " + " ".join(f"'{arg}'" for arg in server_args)
             else:
                 server_args_str = ""
 
@@ -172,7 +172,7 @@ def create_or_update_config(
                 "command": "sh",
                 "args": [
                     "-c",
-                    f'{bootstrap_cmd} "{raw_url}"{server_args_str}'
+                    f"{bootstrap_cmd} '{raw_url}'{server_args_str}"
                 ]
             }
         elif package_type == "local":
@@ -214,17 +214,17 @@ def create_or_update_config(
 
                 if executable_name and executable_name != server_name:
                     # Use --from syntax with remote bootstrap
-                    cmd_args = f'--from "{package_spec}" "{executable_name}"'
+                    cmd_args = f"--from '{package_spec}' '{executable_name}'"
                 else:
                     # Regular syntax
-                    cmd_args = f'"{package_spec}"'
+                    cmd_args = f"'{package_spec}'"
             else:
                 # Regular syntax
-                cmd_args = f'"{package_spec}"'
+                cmd_args = f"'{package_spec}'"
 
             # Add server arguments if provided
             if server_args:
-                server_args_str = " " + " ".join(f'"{arg}"' for arg in server_args)
+                server_args_str = " " + " ".join(f"'{arg}'" for arg in server_args)
             else:
                 server_args_str = ""
 
@@ -232,7 +232,7 @@ def create_or_update_config(
                 "command": "sh",
                 "args": [
                     "-c",
-                    f'{bootstrap_cmd} {cmd_args}{server_args_str}'
+                    f"{bootstrap_cmd} {cmd_args}{server_args_str}"
                 ]
             }
 
@@ -300,7 +300,7 @@ def parse_args():
     server_name = None
     config_file_name = None
     server_args = []
-    bootstrap_url = "https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh"
+    bootstrap_url = "https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/85dcc7edf862a29acf7700b2019dedeff62128e1/scripts/universal-bootstrap.sh"
     executable_name = None
 
     i = 1
