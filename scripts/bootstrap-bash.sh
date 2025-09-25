@@ -517,8 +517,8 @@ case "\$1" in
         case "\$2" in
             "git+https://github.com/apisani1/test-mcp-server-ap25092201.git")
                 echo "[Wrapper] Using module execution for test-mcp-server-ap25092201..." | tee -a /tmp/mcp_wrapper.log >&2
-                # Execute with clean stdio for MCP - redirect any non-JSON output to log file
-                exec uvx --from "\$2" python3 -m src.test_mcp_server_ap25092201.prompt_server
+                # Execute with clean stdio for MCP - use correct installed package module path
+                exec uvx --from "\$2" python3 -m test_mcp_server_ap25092201.prompt_server
                 ;;
             *)
                 uvx "\$@" 2>&1 | tee -a /tmp/mcp_wrapper.log
