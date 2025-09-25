@@ -478,23 +478,31 @@ run_server_direct() {
         # Create completely isolated execution for MCP
         log "Creating isolated execution environment..."
 
-        # Create a wrapper script for completely clean execution
-        cat > /tmp/mcp_wrapper_$$.sh << 'EOF'
+        # Create a wrapper script for completely clean execution with dynamic paths
+        cat > /tmp/mcp_wrapper_$$.sh << EOF
 #!/bin/bash
 # Complete isolation wrapper for MCP server
 
-# Clean environment
-export PATH="/Users/antonio/.local/bin:/Users/antonio/.cargo/bin:/usr/local/bin:/usr/bin:/bin"
-export UV_CACHE_DIR="/Users/antonio/.mcp/cache/uv"
+# Clean environment with dynamic user paths
+export PATH="${HOME}/.local/bin:${HOME}/.cargo/bin:/usr/local/bin:/usr/bin:/bin"
+export UV_CACHE_DIR="${UV_CACHE_DIR}"
 export UV_NO_MODIFY_PATH=1
 export TMPDIR="/tmp"
-cd /tmp
+cd "$HOME"
 
 # Clear all signal handlers
 trap - EXIT INT TERM HUP
 
-# Execute with clean process group
-exec uvx "$@"
+# Add debugging to wrapper
+echo "[Wrapper] Starting uvx with args: \$*" >&2
+echo "[Wrapper] PATH: \$PATH" >&2
+echo "[Wrapper] UV_CACHE_DIR: \$UV_CACHE_DIR" >&2
+
+# Execute with clean process group and capture any exit code
+uvx "\$@"
+exit_code=\$?
+echo "[Wrapper] uvx exited with code: \$exit_code" >&2
+exit \$exit_code
 EOF
 
         chmod +x /tmp/mcp_wrapper_$$.sh
