@@ -475,17 +475,36 @@ run_server_direct() {
         log "User: $(whoami)"
         log "Environment variables with BOOTSTRAP/MCP: $(env | grep -i 'bootstrap\|mcp' || echo 'none found')"
 
-        # Create minimal wrapper for clean MCP execution
+        # Create completely isolated execution for MCP
+        log "Creating isolated execution environment..."
+
+        # Create a wrapper script for completely clean execution
+        cat > /tmp/mcp_wrapper_$$.sh << 'EOF'
+#!/bin/bash
+# Complete isolation wrapper for MCP server
+
+# Clean environment
+export PATH="/Users/antonio/.local/bin:/Users/antonio/.cargo/bin:/usr/local/bin:/usr/bin:/bin"
+export UV_CACHE_DIR="/Users/antonio/.mcp/cache/uv"
+export UV_NO_MODIFY_PATH=1
+export TMPDIR="/tmp"
+cd /tmp
+
+# Clear all signal handlers
+trap - EXIT INT TERM HUP
+
+# Execute with clean process group
+exec uvx "$@"
+EOF
+
+        chmod +x /tmp/mcp_wrapper_$$.sh
+
         if [[ "$USE_FROM_SYNTAX" == "true" ]]; then
-            log "Final command: uvx --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
-
-            # Clean exec with minimal interference - preserve all stdio for MCP
-            exec uvx --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"
+            log "Final command: /tmp/mcp_wrapper_$$.sh --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
+            exec /tmp/mcp_wrapper_$$.sh --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"
         else
-            log "Final command: uvx $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
-
-            # Clean exec with minimal interference - preserve all stdio for MCP
-            exec uvx "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
+            log "Final command: /tmp/mcp_wrapper_$$.sh $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
+            exec /tmp/mcp_wrapper_$$.sh "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
         fi
     fi
 }
