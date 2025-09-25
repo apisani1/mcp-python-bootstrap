@@ -410,6 +410,31 @@ check_environment_freshness() {
     echo "$(date +%s)" > "$last_check_file"
 }
 
+# Clean environment for MCP server execution
+setup_clean_mcp_environment() {
+    # Preserve essential PATH components and UV installation
+    local essential_paths="/usr/local/bin:/usr/bin:/bin"
+    local uv_paths="${HOME}/.local/bin:${HOME}/.cargo/bin"
+    export PATH="${uv_paths}:${essential_paths}"
+
+    # Clean environment variables that might interfere
+    unset STARTUP_MARKER 2>/dev/null || true
+    unset BOOTSTRAP_* 2>/dev/null || true
+    unset MCP_BOOTSTRAP_* 2>/dev/null || true
+
+    # Set up clean temporary directory
+    export TMPDIR="/tmp"
+
+    # Ensure clean working directory
+    cd /tmp || cd "$HOME" || true
+
+    # Set up UV environment properly
+    export UV_CACHE_DIR="${UV_CACHE_DIR:-${HOME}/.cache/uv}"
+    export UV_NO_MODIFY_PATH=1
+
+    log "Environment cleaned for MCP server execution"
+}
+
 # Direct server execution for MCP servers (no monitoring)
 run_server_direct() {
     log "Starting MCP server (direct execution): $PACKAGE_SPEC"
@@ -437,11 +462,29 @@ run_server_direct() {
         fi
     else
         # For PyPI/git packages, use uvx with direct exec
+
+        # Clean environment for MCP server execution
+        setup_clean_mcp_environment
+
+        # Debug environment after cleaning
+        log "=== MCP Server Execution Debug Info ==="
+        log "Working directory: $(pwd)"
+        log "PATH: $PATH"
+        log "UV_CACHE_DIR: ${UV_CACHE_DIR:-not set}"
+        log "TMPDIR: ${TMPDIR:-not set}"
+        log "User: $(whoami)"
+        log "Environment variables with BOOTSTRAP/MCP: $(env | grep -i 'bootstrap\|mcp' || echo 'none found')"
+
+        # Create minimal wrapper for clean MCP execution
         if [[ "$USE_FROM_SYNTAX" == "true" ]]; then
-            log "Executing directly: uvx --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
+            log "Final command: uvx --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
+
+            # Clean exec with minimal interference - preserve all stdio for MCP
             exec uvx --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"
         else
-            log "Executing directly: uvx $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
+            log "Final command: uvx $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
+
+            # Clean exec with minimal interference - preserve all stdio for MCP
             exec uvx "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
         fi
     fi
