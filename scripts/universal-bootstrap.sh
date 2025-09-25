@@ -1,11 +1,11 @@
 #!/bin/sh
 # Universal MCP Python Server Bootstrap
 # Detects platform and routes to appropriate implementation
-# Version: 1.2.1
+# Version: 1.2.2
 
 set -eu
 
-SCRIPT_VERSION="1.2.1"
+SCRIPT_VERSION="1.2.2"
 BASE_URL="${MCP_BOOTSTRAP_BASE_URL:-https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts}"
 CACHE_DIR="${MCP_BOOTSTRAP_CACHE_DIR:-${HOME}/.mcp/bootstrap-cache}"
 LOG_FILE="${HOME}/.mcp/bootstrap.log"
@@ -137,6 +137,18 @@ is_cache_fresh() {
         # Check for exec mode in run_server_direct function
         if grep -q "run_server_direct" "$cache_file" 2>/dev/null && ! grep -q "exec uvx" "$cache_file" 2>/dev/null; then
             log "Cache missing critical exec mode in direct execution - forcing refresh"
+            return 1
+        fi
+
+        # Check for latest debugging and environment isolation (version 1.2.1)
+        if ! grep -q "setup_clean_mcp_environment" "$cache_file" 2>/dev/null; then
+            log "Cache missing critical environment isolation fixes - forcing refresh"
+            return 1
+        fi
+
+        # Check for comprehensive debugging
+        if ! grep -q "MCP Server Execution Debug Info" "$cache_file" 2>/dev/null; then
+            log "Cache missing critical debugging enhancements - forcing refresh"
             return 1
         fi
     fi
