@@ -1,11 +1,11 @@
 #!/bin/sh
 # Universal MCP Python Server Bootstrap
 # Detects platform and routes to appropriate implementation
-# Version: 1.2.0
+# Version: 1.2.1
 
 set -eu
 
-SCRIPT_VERSION="1.2.0"
+SCRIPT_VERSION="1.2.1"
 BASE_URL="${MCP_BOOTSTRAP_BASE_URL:-https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts}"
 CACHE_DIR="${MCP_BOOTSTRAP_CACHE_DIR:-${HOME}/.mcp/bootstrap-cache}"
 LOG_FILE="${HOME}/.mcp/bootstrap.log"
@@ -125,6 +125,18 @@ is_cache_fresh() {
         # Check for SCRIPT_ARGS fixes
         if grep -q 'SCRIPT_ARGS\[@\]' "$cache_file" 2>/dev/null && ! grep -q 'SCRIPT_ARGS\[@\]:-' "$cache_file" 2>/dev/null; then
             log "Cache missing critical SCRIPT_ARGS fixes - forcing refresh"
+            return 1
+        fi
+
+        # Check for direct execution mode (critical for MCP servers)
+        if ! grep -q "run_server_direct" "$cache_file" 2>/dev/null; then
+            log "Cache missing critical direct execution mode for MCP servers - forcing refresh"
+            return 1
+        fi
+
+        # Check for exec mode in run_server_direct function
+        if grep -q "run_server_direct" "$cache_file" 2>/dev/null && ! grep -q "exec uvx" "$cache_file" 2>/dev/null; then
+            log "Cache missing critical exec mode in direct execution - forcing refresh"
             return 1
         fi
     fi
