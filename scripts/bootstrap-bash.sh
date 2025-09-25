@@ -1,11 +1,11 @@
 #!/bin/bash
 # Enhanced Bash MCP Python Server Bootstrap
 # Supports Linux, macOS, FreeBSD, WSL
-# Version: 1.2.2
+# Version: 1.2.3
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.2.2"
+SCRIPT_VERSION="1.2.3"
 
 # Parse arguments to handle --from syntax
 if [[ "${1:-}" == "--from" ]] && [[ $# -ge 3 ]]; then
