@@ -493,26 +493,68 @@ cd "$HOME"
 # Clear all signal handlers
 trap - EXIT INT TERM HUP
 
-# Add debugging to wrapper
-echo "[Wrapper] Starting uvx with args: \$*" >&2
-echo "[Wrapper] PATH: \$PATH" >&2
-echo "[Wrapper] UV_CACHE_DIR: \$UV_CACHE_DIR" >&2
+# Add debugging to wrapper - redirect to both stderr and a log file
+echo "[Wrapper] Starting uvx with args: \$*" | tee -a /tmp/mcp_wrapper.log >&2
+echo "[Wrapper] PATH: \$PATH" | tee -a /tmp/mcp_wrapper.log >&2
+echo "[Wrapper] UV_CACHE_DIR: \$UV_CACHE_DIR" | tee -a /tmp/mcp_wrapper.log >&2
+
+# Test if uvx command works first
+if ! command -v uvx >/dev/null 2>&1; then
+    echo "[Wrapper] ERROR: uvx command not found in PATH" | tee -a /tmp/mcp_wrapper.log >&2
+    exit 127
+fi
+
+# Test basic uvx functionality
+echo "[Wrapper] Testing uvx --version..." | tee -a /tmp/mcp_wrapper.log >&2
+uvx --version 2>&1 | tee -a /tmp/mcp_wrapper.log >&2
 
 # Execute with clean process group and capture any exit code
-uvx "\$@"
+echo "[Wrapper] Executing uvx with full arguments..." | tee -a /tmp/mcp_wrapper.log >&2
+uvx "\$@" 2>&1 | tee -a /tmp/mcp_wrapper.log
 exit_code=\$?
-echo "[Wrapper] uvx exited with code: \$exit_code" >&2
+echo "[Wrapper] uvx exited with code: \$exit_code" | tee -a /tmp/mcp_wrapper.log >&2
 exit \$exit_code
 EOF
 
         chmod +x /tmp/mcp_wrapper_$$.sh
 
+        # Clear any previous wrapper log
+        rm -f /tmp/mcp_wrapper.log
+
         if [[ "$USE_FROM_SYNTAX" == "true" ]]; then
             log "Final command: /tmp/mcp_wrapper_$$.sh --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
-            exec /tmp/mcp_wrapper_$$.sh --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"
+
+            # Execute wrapper and capture result
+            /tmp/mcp_wrapper_$$.sh --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"
+            wrapper_exit=$?
+
+            # Report wrapper execution details
+            if [[ -f /tmp/mcp_wrapper.log ]]; then
+                log "=== Wrapper Execution Log ==="
+                while IFS= read -r line; do
+                    log "WRAPPER: $line"
+                done < /tmp/mcp_wrapper.log
+            fi
+
+            log "Wrapper exited with code: $wrapper_exit"
+            exit $wrapper_exit
         else
             log "Final command: /tmp/mcp_wrapper_$$.sh $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
-            exec /tmp/mcp_wrapper_$$.sh "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
+
+            # Execute wrapper and capture result
+            /tmp/mcp_wrapper_$$.sh "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
+            wrapper_exit=$?
+
+            # Report wrapper execution details
+            if [[ -f /tmp/mcp_wrapper.log ]]; then
+                log "=== Wrapper Execution Log ==="
+                while IFS= read -r line; do
+                    log "WRAPPER: $line"
+                done < /tmp/mcp_wrapper.log
+            fi
+
+            log "Wrapper exited with code: $wrapper_exit"
+            exit $wrapper_exit
         fi
     fi
 }
