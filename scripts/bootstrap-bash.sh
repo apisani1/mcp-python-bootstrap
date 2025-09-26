@@ -96,23 +96,6 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Standardized UV PATH setup
-setup_uv_path() {
-    local uv_dirs="$HOME/.local/bin:$HOME/.cargo/bin"
-
-    # Only add to PATH if not already present
-    case ":$PATH:" in
-        *":$HOME/.local/bin:"*) ;;
-        *) export PATH="$HOME/.local/bin:$PATH" ;;
-    esac
-
-    case ":$PATH:" in
-        *":$HOME/.cargo/bin:"*) ;;
-        *) export PATH="$HOME/.cargo/bin:$PATH" ;;
-    esac
-
-    log "UV PATH configured: ~/.local/bin and ~/.cargo/bin added to PATH"
-}
 
 # Network connectivity check
 check_network() {
@@ -137,61 +120,55 @@ check_network() {
     return 0
 }
 
-# Check if uvx is available and working
-check_uvx() {
-    if command_exists uvx; then
+# Detect existing uvx or install in isolated environment
+# Sets global UVX_PATH variable to absolute path of uvx
+detect_or_install_uvx() {
+    log "Detecting or installing uvx (non-invasive approach)..."
+
+    # Phase 1: Try to detect existing uvx installation
+    if UVX_PATH=$(command -v uvx 2>/dev/null); then
         local version
-        if version=$(uvx --version 2>/dev/null); then
-            log "uvx found: $version"
+        if version=$("$UVX_PATH" --version 2>/dev/null); then
+            log "Found existing uvx at: $UVX_PATH"
+            log "Version: $version"
             return 0
         else
-            warn "uvx command exists but not working properly"
-            return 1
+            warn "uvx found at $UVX_PATH but not working properly"
         fi
-    else
-        log "uvx not found, will install"
-        return 1
     fi
-}
 
-# Check if uv is available
-check_uv() {
-    if command_exists uv; then
-        local version
-        if version=$(uv --version 2>/dev/null); then
-            log "uv found: $version"
-            return 0
-        else
-            warn "uv command exists but not working properly"
-            return 1
-        fi
-    else
-        log "uv not found, will install"
-        return 1
-    fi
-}
+    # Phase 2: No working uvx found, install in isolated environment
+    log "No working uvx found, installing in isolated environment..."
 
-# Install uv with retry logic and verification
-install_uv_with_retry() {
+    # Create isolated installation directory
+    local isolated_dir="/tmp/mcp-bootstrap-$$"
+    mkdir -p "$isolated_dir"
+
+    # Set up isolated installation environment
+    export UV_INSTALL_DIR="$isolated_dir"
+    export UV_CACHE_DIR="$isolated_dir/cache"
+    export UV_NO_MODIFY_PATH=1
+
     local max_attempts=3
     local attempt=1
     local platform
     platform=$(detect_platform)
 
-    log "Installing uv for platform: $platform"
+    log "Installing uv in isolated mode for platform: $platform"
+    log "Installation directory: $isolated_dir"
 
     while [[ $attempt -le $max_attempts ]]; do
         log "Installation attempt $attempt/$max_attempts"
 
-        # Set UV_CACHE_DIR for installation
-        export UV_CACHE_DIR="$UV_CACHE_DIR"
-
+        # Download and run installer with isolated settings
         if command_exists curl; then
-            if curl -LsSf https://astral.sh/uv/install.sh | sh -s -- --no-modify-path >&2; then
+            if curl -LsSf https://astral.sh/uv/install.sh | \
+               UV_INSTALL_DIR="$isolated_dir" sh -s -- --no-modify-path >&2; then
                 break
             fi
         elif command_exists wget; then
-            if wget -qO- https://astral.sh/uv/install.sh | sh -s -- --no-modify-path >&2; then
+            if wget -qO- https://astral.sh/uv/install.sh | \
+               UV_INSTALL_DIR="$isolated_dir" sh -s -- --no-modify-path >&2; then
                 break
             fi
         else
@@ -211,20 +188,29 @@ install_uv_with_retry() {
         error "Failed to install uv after $max_attempts attempts"
     fi
 
-    # Add uv to PATH for current session
-    setup_uv_path
+    # Set UVX_PATH to isolated installation
+    UVX_PATH="$isolated_dir/bin/uvx"
 
-    # Verify installation
-    if ! command_exists uv; then
-        error "uv installation completed but command not found in PATH"
+    # Verify isolated installation
+    if [[ ! -x "$UVX_PATH" ]]; then
+        # Try alternative location
+        UVX_PATH="$isolated_dir/.local/bin/uvx"
+        if [[ ! -x "$UVX_PATH" ]]; then
+            error "uvx not found in isolated installation at $isolated_dir"
+        fi
     fi
 
-    # Verify uv is working
-    if ! uv --version >/dev/null 2>&1; then
-        error "uv installed but not working properly"
+    # Test that isolated uvx works
+    if ! "$UVX_PATH" --version >/dev/null 2>&1; then
+        error "Isolated uvx at $UVX_PATH not working properly"
     fi
 
-    success "uv installed and verified successfully"
+    local version
+    version=$("$UVX_PATH" --version 2>/dev/null)
+    success "uvx installed and verified in isolated environment: $UVX_PATH"
+    log "Version: $version"
+
+    return 0
 }
 
 # Detect package type
@@ -411,36 +397,12 @@ check_environment_freshness() {
 }
 
 # Clean environment for MCP server execution
-setup_clean_mcp_environment() {
-    # Preserve essential PATH components and UV installation
-    local essential_paths="/usr/local/bin:/usr/bin:/bin"
-    local uv_paths="${HOME}/.local/bin:${HOME}/.cargo/bin"
-    export PATH="${uv_paths}:${essential_paths}"
-
-    # Clean environment variables that might interfere
-    unset STARTUP_MARKER 2>/dev/null || true
-    unset BOOTSTRAP_* 2>/dev/null || true
-    unset MCP_BOOTSTRAP_* 2>/dev/null || true
-
-    # Set up clean temporary directory
-    export TMPDIR="/tmp"
-
-    # Ensure clean working directory
-    cd /tmp || cd "$HOME" || true
-
-    # Set up UV environment properly
-    export UV_CACHE_DIR="${UV_CACHE_DIR:-${HOME}/.cache/uv}"
-    export UV_NO_MODIFY_PATH=1
-
-    log "Environment cleaned for MCP server execution"
-}
 
 # Direct server execution for MCP servers (no monitoring)
 run_server_direct() {
     log "Starting MCP server (direct execution): $PACKAGE_SPEC"
 
-    # Ensure PATH includes uv
-    setup_uv_path
+    # Set UV cache directory
     export UV_CACHE_DIR="$UV_CACHE_DIR"
 
     # Direct execution without monitoring - essential for MCP stdio communication
@@ -461,31 +423,28 @@ run_server_direct() {
             error "curl is required to download GitHub raw URLs"
         fi
     else
-        # For PyPI/git packages, use uvx with direct exec
+        # For PyPI/git packages, use uvx with detected/installed path
 
-        # Clean environment for MCP server execution
-        setup_clean_mcp_environment
-
-        # Debug environment after cleaning
+        # Debug environment
         log "=== MCP Server Execution Debug Info ==="
         log "Working directory: $(pwd)"
-        log "PATH: $PATH"
+        log "UVX_PATH: $UVX_PATH"
         log "UV_CACHE_DIR: ${UV_CACHE_DIR:-not set}"
-        log "TMPDIR: ${TMPDIR:-not set}"
         log "User: $(whoami)"
-        log "Environment variables with BOOTSTRAP/MCP: $(env | grep -i 'bootstrap\|mcp' || echo 'none found')"
 
         # Create completely isolated execution for MCP
         log "Creating isolated execution environment..."
 
-        # Create a wrapper script for completely clean execution with dynamic paths
+        # Create a wrapper script for completely clean execution with dynamic uvx path
         cat > /tmp/mcp_wrapper_$$.sh << EOF
 #!/bin/bash
 # Complete isolation wrapper for MCP server
 
-# Clean environment with dynamic user paths
-export PATH="${HOME}/.local/bin:${HOME}/.cargo/bin:/usr/local/bin:/usr/bin:/bin"
-export UV_CACHE_DIR="${UV_CACHE_DIR}"
+# Use the dynamically detected/installed uvx path
+UVX_BINARY="$UVX_PATH"
+
+# Clean environment setup
+export UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/uv-cache}"
 export UV_NO_MODIFY_PATH=1
 export TMPDIR="/tmp"
 cd "$HOME"
@@ -495,18 +454,18 @@ trap - EXIT INT TERM HUP
 
 # Add debugging to wrapper - redirect to both stderr and a log file
 echo "[Wrapper] Starting uvx with args: \$*" | tee -a /tmp/mcp_wrapper.log >&2
-echo "[Wrapper] PATH: \$PATH" | tee -a /tmp/mcp_wrapper.log >&2
+echo "[Wrapper] UVX_BINARY: \$UVX_BINARY" | tee -a /tmp/mcp_wrapper.log >&2
 echo "[Wrapper] UV_CACHE_DIR: \$UV_CACHE_DIR" | tee -a /tmp/mcp_wrapper.log >&2
 
-# Test if uvx command works first
-if ! command -v uvx >/dev/null 2>&1; then
-    echo "[Wrapper] ERROR: uvx command not found in PATH" | tee -a /tmp/mcp_wrapper.log >&2
+# Test if uvx command exists at detected/installed location
+if ! test -x "\$UVX_BINARY"; then
+    echo "[Wrapper] ERROR: uvx not found at \$UVX_BINARY" | tee -a /tmp/mcp_wrapper.log >&2
     exit 127
 fi
 
 # Test basic uvx functionality
 echo "[Wrapper] Testing uvx --version..." | tee -a /tmp/mcp_wrapper.log >&2
-uvx --version 2>&1 | tee -a /tmp/mcp_wrapper.log >&2
+"\$UVX_BINARY" --version 2>&1 | tee -a /tmp/mcp_wrapper.log >&2
 
 # Execute with clean process group and capture any exit code
 echo "[Wrapper] Executing uvx with full arguments..." | tee -a /tmp/mcp_wrapper.log >&2
@@ -518,15 +477,15 @@ case "\$1" in
             "git+https://github.com/apisani1/test-mcp-server-ap25092201.git")
                 echo "[Wrapper] Using entry point execution for test-mcp-server-ap25092201..." | tee -a /tmp/mcp_wrapper.log >&2
                 # Execute with clean stdio for MCP - use the proper entry point
-                exec uvx --from "\$2" test-mcp-server
+                exec "\$UVX_BINARY" --from "\$2" test-mcp-server
                 ;;
             *)
-                uvx "\$@" 2>&1 | tee -a /tmp/mcp_wrapper.log
+                "\$UVX_BINARY" "\$@" 2>&1 | tee -a /tmp/mcp_wrapper.log
                 ;;
         esac
         ;;
     *)
-        uvx "\$@" 2>&1 | tee -a /tmp/mcp_wrapper.log
+        "\$UVX_BINARY" "\$@" 2>&1 | tee -a /tmp/mcp_wrapper.log
         ;;
 esac
 
@@ -558,8 +517,7 @@ EOF
 run_server_monitored() {
     log "Starting monitored MCP server: $PACKAGE_SPEC"
 
-    # Ensure PATH includes uv
-    setup_uv_path
+    # Set UV cache directory
     export UV_CACHE_DIR="$UV_CACHE_DIR"
 
     # Create startup marker
@@ -666,24 +624,8 @@ main() {
         warn "Network issues detected, but continuing anyway"
     fi
 
-    # Ensure uvx is available
-    if ! check_uvx; then
-        if ! check_uv; then
-            install_uv_with_retry
-        else
-            log "uv found, uvx should be available"
-            setup_uv_path
-            if ! check_uvx; then
-                error "uv found but uvx not working"
-            fi
-        fi
-
-        # Final verification that uvx is available after installation
-        if ! check_uvx; then
-            error "uvx still not available after installation process"
-        fi
-        success "uvx installation verified successfully"
-    fi
+    # Detect existing uvx or install in isolated environment
+    detect_or_install_uvx
 
     # Run the server (use direct execution for clean MCP stdio communication)
     run_server_direct

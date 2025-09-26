@@ -93,22 +93,6 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Standardized UV PATH setup (POSIX-compliant)
-setup_uv_path() {
-    # Only add to PATH if not already present
-    case ":$PATH:" in
-        *":$HOME/.local/bin:"*) ;;
-        *) PATH="$HOME/.local/bin:$PATH" ;;
-    esac
-
-    case ":$PATH:" in
-        *":$HOME/.cargo/bin:"*) ;;
-        *) PATH="$HOME/.cargo/bin:$PATH" ;;
-    esac
-
-    export PATH
-    log "UV PATH configured: ~/.local/bin and ~/.cargo/bin added to PATH"
-}
 
 # Platform detection (POSIX-compliant)
 detect_platform() {
@@ -133,55 +117,94 @@ detect_platform() {
     esac
 }
 
-# Check for uvx
-check_uvx() {
-    if command_exists uvx; then
-        if uvx --version >/dev/null 2>&1; then
-            log "uvx found and working"
+# Detect existing uvx or install in isolated environment (POSIX-compliant)
+# Sets global UVX_PATH variable to absolute path of uvx
+detect_or_install_uvx() {
+    log "Detecting or installing uvx (non-invasive approach)..."
+
+    # Phase 1: Try to detect existing uvx installation
+    if UVX_PATH=$(command -v uvx 2>/dev/null); then
+        if "$UVX_PATH" --version >/dev/null 2>&1; then
+            log "Found existing uvx at: $UVX_PATH"
+            version=$("$UVX_PATH" --version 2>/dev/null || echo "unknown")
+            log "Version: $version"
             return 0
+        else
+            log "uvx found at $UVX_PATH but not working properly"
         fi
     fi
-    log "uvx not found or not working"
-    return 1
-}
 
-# Check for uv
-check_uv() {
-    if command_exists uv; then
-        if uv --version >/dev/null 2>&1; then
-            log "uv found and working"
-            return 0
+    # Phase 2: No working uvx found, install in isolated environment
+    log "No working uvx found, installing in isolated environment..."
+
+    # Create isolated installation directory
+    isolated_dir="/tmp/mcp-bootstrap-$$"
+    mkdir -p "$isolated_dir" || error "Cannot create isolated directory"
+
+    # Set up isolated installation environment
+    UV_INSTALL_DIR="$isolated_dir"
+    UV_CACHE_DIR="$isolated_dir/cache"
+    UV_NO_MODIFY_PATH=1
+    export UV_INSTALL_DIR UV_CACHE_DIR UV_NO_MODIFY_PATH
+
+    max_attempts=3
+    attempt=1
+    platform=$(detect_platform)
+
+    log "Installing uv in isolated mode for platform: $platform"
+    log "Installation directory: $isolated_dir"
+
+    while [ $attempt -le $max_attempts ]; do
+        log "Installation attempt $attempt/$max_attempts"
+
+        # Download and run installer with isolated settings
+        if command_exists curl; then
+            if UV_INSTALL_DIR="$isolated_dir" curl -LsSf https://astral.sh/uv/install.sh | sh -s -- --no-modify-path >/dev/null 2>&1; then
+                break
+            fi
+        elif command_exists wget; then
+            if UV_INSTALL_DIR="$isolated_dir" wget -qO- https://astral.sh/uv/install.sh | sh -s -- --no-modify-path >/dev/null 2>&1; then
+                break
+            fi
+        else
+            error "Neither curl nor wget available for downloading uv installer"
+        fi
+
+        warn "Installation attempt $attempt failed"
+        attempt=$((attempt + 1))
+
+        if [ $attempt -le $max_attempts ]; then
+            log "Retrying in 5 seconds..."
+            sleep 5
+        fi
+    done
+
+    if [ $attempt -gt $max_attempts ]; then
+        error "Failed to install uv after $max_attempts attempts"
+    fi
+
+    # Set UVX_PATH to isolated installation
+    UVX_PATH="$isolated_dir/bin/uvx"
+
+    # Verify isolated installation
+    if [ ! -x "$UVX_PATH" ]; then
+        # Try alternative location
+        UVX_PATH="$isolated_dir/.local/bin/uvx"
+        if [ ! -x "$UVX_PATH" ]; then
+            error "uvx not found in isolated installation at $isolated_dir"
         fi
     fi
-    log "uv not found or not working"
-    return 1
-}
 
-# Install uv (POSIX-compliant)
-install_uv() {
-    log "Installing uv (POSIX mode)..."
-
-    if command_exists curl; then
-        curl -LsSf https://astral.sh/uv/install.sh | sh -s -- --no-modify-path
-    elif command_exists wget; then
-        wget -qO- https://astral.sh/uv/install.sh | sh -s -- --no-modify-path
-    else
-        error "Neither curl nor wget available"
+    # Test that isolated uvx works
+    if ! "$UVX_PATH" --version >/dev/null 2>&1; then
+        error "Isolated uvx at $UVX_PATH not working properly"
     fi
 
-    # Add to PATH
-    setup_uv_path
+    version=$("$UVX_PATH" --version 2>/dev/null || echo "unknown")
+    success "uvx installed and verified in isolated environment: $UVX_PATH"
+    log "Version: $version"
 
-    # Verify installation
-    if ! command_exists uv; then
-        error "uv installation failed"
-    fi
-
-    if ! uv --version >/dev/null 2>&1; then
-        error "uv installed but not working"
-    fi
-
-    success "uv installed successfully"
+    return 0
 }
 
 # Detect package type (POSIX-compliant)
@@ -218,8 +241,6 @@ validate_package_spec() {
 run_server() {
     log "Starting MCP server: $PACKAGE_SPEC"
 
-    # Ensure PATH
-    setup_uv_path
 
     # Detect package type and execute accordingly
     package_type=$(detect_package_type "$PACKAGE_SPEC")
@@ -244,12 +265,12 @@ run_server() {
         # For PyPI/git packages, use uvx
         if [ "$USE_FROM_SYNTAX" = "true" ]; then
             # Use --from syntax: uvx --from package_name executable_name [args...]
-            log "Executing: uvx --from $PACKAGE_SPEC $EXECUTABLE_NAME $SCRIPT_ARGS"
-            exec uvx --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" $SCRIPT_ARGS
+            log "Executing: $UVX_PATH --from $PACKAGE_SPEC $EXECUTABLE_NAME $SCRIPT_ARGS"
+            exec "$UVX_PATH" --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" $SCRIPT_ARGS
         else
             # Regular uvx syntax
-            log "Executing: uvx $PACKAGE_SPEC $SCRIPT_ARGS"
-            exec uvx "$PACKAGE_SPEC" $SCRIPT_ARGS
+            log "Executing: $UVX_PATH $PACKAGE_SPEC $SCRIPT_ARGS"
+            exec "$UVX_PATH" "$PACKAGE_SPEC" $SCRIPT_ARGS
         fi
     fi
 }
@@ -262,21 +283,8 @@ main() {
     init_environment
     validate_package_spec
 
-    # Ensure uvx is available
-    if ! check_uvx; then
-        if ! check_uv; then
-            install_uv
-        else
-            log "uv found, setting up PATH for uvx"
-            setup_uv_path
-        fi
-
-        # Final verification after installation/setup
-        if ! check_uvx; then
-            error "uvx still not available after installation process"
-        fi
-        success "uvx installation verified successfully"
-    fi
+    # Detect existing uvx or install in isolated environment
+    detect_or_install_uvx
 
     # Run the server (pass remaining args)
     run_server
