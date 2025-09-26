@@ -183,15 +183,23 @@ detect_or_install_uvx() {
         error "Failed to install uv after $max_attempts attempts"
     fi
 
-    # Set UVX_PATH to isolated installation
-    UVX_PATH="$isolated_dir/bin/uvx"
+    # Set UVX_PATH to isolated installation - try different possible locations
+    # 1. Direct installation directory (when using UV_INSTALL_DIR)
+    UVX_PATH="$isolated_dir/uvx"
 
     # Verify isolated installation
     if [ ! -x "$UVX_PATH" ]; then
-        # Try alternative location
-        UVX_PATH="$isolated_dir/.local/bin/uvx"
+        # 2. Try bin subdirectory
+        UVX_PATH="$isolated_dir/bin/uvx"
         if [ ! -x "$UVX_PATH" ]; then
-            error "uvx not found in isolated installation at $isolated_dir"
+            # 3. Try .local/bin subdirectory
+            UVX_PATH="$isolated_dir/.local/bin/uvx"
+            if [ ! -x "$UVX_PATH" ]; then
+                # Debug: list what's actually in the directory
+                log "Contents of $isolated_dir:"
+                ls -la "$isolated_dir" 2>/dev/null || true
+                error "uvx not found in isolated installation at $isolated_dir"
+            fi
         fi
     fi
 
