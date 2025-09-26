@@ -1,13 +1,16 @@
 #!/bin/bash
 # Enhanced Bash MCP Python Server Bootstrap
 # Supports Linux, macOS, FreeBSD, WSL
-# Version: 1.2.9
+# Version: 1.3.0
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.2.9"
+SCRIPT_VERSION="1.3.0"
 
-# Parse arguments to handle --from syntax
+# Store original arguments for later processing
+ORIGINAL_ARGS=("$@")
+
+# Parse arguments to handle --from syntax (initial parsing)
 if [[ "${1:-}" == "--from" ]] && [[ $# -ge 3 ]]; then
     # --from package_name executable_name [additional_args...]
     PACKAGE_SPEC="$2"
@@ -20,6 +23,7 @@ else
     EXECUTABLE_NAME=""
     SCRIPT_ARGS=("${@:2}")
     USE_FROM_SYNTAX=false
+    # Auto-detection will happen later in init_arguments() after functions are defined
 fi
 
 # Configuration
@@ -238,6 +242,51 @@ detect_package_type() {
     fi
 }
 
+# Auto-detect executable name for git packages
+detect_executable_name() {
+    local package_spec="$1"
+    local package_type=$(detect_package_type "$package_spec")
+
+    if [[ "$package_type" == "git" ]]; then
+        # Extract repository name from git URL
+        local repo_name
+        if [[ "$package_spec" =~ git\+https?://[^/]+/[^/]+/([^/]+)(\.git)?$ ]]; then
+            repo_name="${BASH_REMATCH[1]}"
+
+            # Remove .git suffix if present
+            repo_name="${repo_name%.git}"
+
+            # Common patterns for test MCP servers
+            # Pattern: test-mcp-server-ap25092201 -> test-mcp-server
+            if [[ "$repo_name" =~ ^(.+)-[a-z]{2}[0-9]{8}$ ]]; then
+                echo "${BASH_REMATCH[1]}"
+                return 0
+            fi
+
+            # Pattern: mcp-server-something -> mcp-server-something (keep as is)
+            if [[ "$repo_name" =~ ^mcp-server-.+ ]]; then
+                echo "$repo_name"
+                return 0
+            fi
+
+            # For other git packages, assume executable matches repo name
+            echo "$repo_name"
+            return 0
+        fi
+    fi
+
+    # For PyPI packages, assume executable matches package name
+    if [[ "$package_type" == "pypi" ]]; then
+        # Remove version constraints
+        local package_name=$(echo "$package_spec" | sed -E 's/([a-zA-Z0-9_-]+).*/\1/')
+        echo "$package_name"
+        return 0
+    fi
+
+    # Default: no executable name detected
+    return 1
+}
+
 # Validate git URL package
 validate_git_package() {
     local package_spec="$1"
@@ -357,6 +406,34 @@ verify_package_exists() {
             return 0
             ;;
     esac
+}
+
+# Initialize arguments with auto-detection (called after functions are defined)
+init_arguments() {
+    # If we didn't use --from syntax initially, try auto-detection
+    if [[ "$USE_FROM_SYNTAX" == "false" && -n "$PACKAGE_SPEC" ]]; then
+        local detected_executable=""
+        if detected_executable=$(detect_executable_name "$PACKAGE_SPEC"); then
+            # Extract package name from git URL for comparison
+            local package_name="$PACKAGE_SPEC"
+            if [[ "$PACKAGE_SPEC" == git+* ]]; then
+                # Extract repo name from git URL
+                if [[ "$PACKAGE_SPEC" =~ git\+https?://[^/]+/[^/]+/([^/]+)(\.git)?$ ]]; then
+                    package_name="${BASH_REMATCH[1]}"
+                    # Remove .git suffix if present
+                    package_name="${package_name%.git}"
+                fi
+            fi
+
+            # If detected executable differs from package name, use --from syntax
+            if [[ "$detected_executable" != "$package_name" ]]; then
+                log "Auto-detected executable name mismatch - using --from syntax"
+                log "Package: $package_name, Executable: $detected_executable"
+                EXECUTABLE_NAME="$detected_executable"
+                USE_FROM_SYNTAX=true
+            fi
+        fi
+    fi
 }
 
 # Validate package specification
@@ -614,6 +691,9 @@ main() {
 
     # Initialize environment
     init_environment
+
+    # Initialize arguments with auto-detection
+    init_arguments
 
     # Validate inputs
     validate_package_spec

@@ -1,11 +1,11 @@
 #!/bin/sh
 # Universal MCP Python Server Bootstrap
 # Detects platform and routes to appropriate implementation
-# Version: 1.2.9
+# Version: 1.3.0
 
 set -eu
 
-SCRIPT_VERSION="1.2.9"
+SCRIPT_VERSION="1.3.0"
 BASE_URL="${MCP_BOOTSTRAP_BASE_URL:-https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts}"
 CACHE_DIR="${MCP_BOOTSTRAP_CACHE_DIR:-${HOME}/.mcp/bootstrap-cache}"
 LOG_FILE="${HOME}/.mcp/bootstrap.log"
@@ -185,6 +185,18 @@ is_cache_fresh() {
         # Check for awk-based filtering (latest streaming filter fix)
         if ! grep -q "/^Starting MCP/" "$cache_file" 2>/dev/null; then
             log "Cache missing critical awk-based JSON-RPC filtering - forcing refresh"
+            return 1
+        fi
+
+        # Check for automatic executable name detection (version 1.3.0)
+        if ! grep -q "detect_executable_name" "$cache_file" 2>/dev/null; then
+            log "Cache missing automatic executable name detection - forcing refresh"
+            return 1
+        fi
+
+        # Check for auto-detection of --from syntax
+        if ! grep -q "Auto-detected executable mismatch" "$cache_file" 2>/dev/null; then
+            log "Cache missing automatic --from syntax detection - forcing refresh"
             return 1
         fi
     fi

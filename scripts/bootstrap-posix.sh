@@ -1,11 +1,11 @@
 #!/bin/sh
 # POSIX-compliant MCP Python Server Bootstrap
 # Supports Alpine Linux and minimal environments
-# Version: 1.2.6
+# Version: 1.3.0
 
 set -eu
 
-SCRIPT_VERSION="1.2.6"
+SCRIPT_VERSION="1.3.0"
 
 # Handle help and version first
 case "${1:-}" in
@@ -30,6 +30,45 @@ EOF
         ;;
 esac
 
+# Auto-detect executable name for git packages (POSIX-compliant)
+detect_executable_name_posix() {
+    package_spec="$1"
+
+    # Check if it's a git package
+    case "$package_spec" in
+        git+*)
+            # Extract repository name from git URL
+            repo_name=$(echo "$package_spec" | sed -E 's|git\+https?://[^/]+/[^/]+/([^/]+)(\.git)?.*|\1|')
+
+            # Pattern: test-mcp-server-ap25092201 -> test-mcp-server
+            case "$repo_name" in
+                *-[a-z][a-z][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9])
+                    # Remove the suffix pattern
+                    echo "$repo_name" | sed -E 's/-[a-z][a-z][0-9]{8}$//'
+                    return 0
+                    ;;
+                mcp-server-*)
+                    # Keep MCP server names as-is
+                    echo "$repo_name"
+                    return 0
+                    ;;
+                *)
+                    # Default: use repo name
+                    echo "$repo_name"
+                    return 0
+                    ;;
+            esac
+            ;;
+        *)
+            # For PyPI packages, remove version constraints
+            echo "$package_spec" | sed -E 's/([a-zA-Z0-9_-]+).*/\1/'
+            return 0
+            ;;
+    esac
+
+    return 1
+}
+
 # Parse arguments to handle --from syntax (POSIX-compliant)
 if [ "${1:-}" = "--from" ] && [ $# -ge 3 ]; then
     # --from package_name executable_name [additional_args...]
@@ -43,6 +82,28 @@ else
     EXECUTABLE_NAME=""
     shift 1
     USE_FROM_SYNTAX="false"
+
+    # Auto-detect if we need --from syntax for git packages
+    if [ -n "$PACKAGE_SPEC" ]; then
+        detected_executable=$(detect_executable_name_posix "$PACKAGE_SPEC")
+        if [ $? -eq 0 ] && [ -n "$detected_executable" ]; then
+            # Extract package name from git URL for comparison
+            package_name="$PACKAGE_SPEC"
+            case "$PACKAGE_SPEC" in
+                git+*)
+                    package_name=$(echo "$PACKAGE_SPEC" | sed -E 's|git\+https?://[^/]+/[^/]+/([^/]+)(\.git)?.*|\1|')
+                    ;;
+            esac
+
+            # If detected executable differs from package name, use --from syntax
+            if [ "$detected_executable" != "$package_name" ]; then
+                printf "[MCP-Python] Auto-detected executable mismatch: package='%s', executable='%s'\n" "$package_name" "$detected_executable" >&2
+                printf "[MCP-Python] Automatically using --from syntax to resolve executable name\n" >&2
+                EXECUTABLE_NAME="$detected_executable"
+                USE_FROM_SYNTAX="true"
+            fi
+        fi
+    fi
 fi
 
 # Store remaining arguments
