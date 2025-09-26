@@ -439,6 +439,9 @@ run_server_direct() {
         log "UVX_PATH: $UVX_PATH"
         log "UV_CACHE_DIR: ${UV_CACHE_DIR:-not set}"
         log "User: $(whoami)"
+        log "Package: $PACKAGE_SPEC"
+        log "Arguments: ${SCRIPT_ARGS[*]-}"
+        log "Use from syntax: $USE_FROM_SYNTAX"
 
         # Create completely isolated execution for MCP
         log "Creating isolated execution environment..."
@@ -451,14 +454,19 @@ run_server_direct() {
 # Use the dynamically detected/installed uvx path
 UVX_BINARY="$UVX_PATH"
 
-# Clean environment setup
+# Clean environment setup for MCP server
 export UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/uv-cache}"
 export UV_NO_MODIFY_PATH=1
 export TMPDIR="/tmp"
-cd "$HOME"
 
-# Clear all signal handlers
-trap - EXIT INT TERM HUP
+# Ensure proper working directory for MCP server
+cd "\$HOME" || cd "/tmp"
+
+# Clear all signal handlers to prevent interference
+trap - EXIT INT TERM HUP QUIT
+
+# Ensure line buffering for better I/O behavior
+export PYTHONUNBUFFERED=1
 
 # Add debugging to wrapper - redirect to both stderr and a log file
 echo "[Wrapper] Starting uvx with args: \$*" | tee -a /tmp/mcp_wrapper.log >&2
@@ -471,15 +479,18 @@ if ! test -x "\$UVX_BINARY"; then
     exit 127
 fi
 
-# Test basic uvx functionality
-echo "[Wrapper] Testing uvx --version..." | tee -a /tmp/mcp_wrapper.log >&2
-"\$UVX_BINARY" --version 2>&1 | tee -a /tmp/mcp_wrapper.log >&2
+# Test basic uvx functionality (quietly)
+"\$UVX_BINARY" --version >/tmp/mcp_wrapper.log 2>&1 || {
+    echo "[Wrapper] ERROR: uvx version check failed" >&2
+    exit 127
+}
 
-# Execute with clean process group and capture any exit code
-echo "[Wrapper] Executing uvx with full arguments..." | tee -a /tmp/mcp_wrapper.log >&2
+# Final debug message with exact command being executed
+echo "[Wrapper] Final command: \$UVX_BINARY \$*" >&2
+echo "[Wrapper] Starting MCP server with clean stdio..." >&2
 
-# Execute uvx with clean stdio for MCP server communication
-echo "[Wrapper] Executing uvx with clean stdio for MCP..." | tee -a /tmp/mcp_wrapper.log >&2
+# Execute uvx with completely clean stdio for MCP server communication
+# The MCP server needs clean stdout for JSON-RPC, but stderr can be preserved for debugging
 exec "\$UVX_BINARY" "\$@"
 EOF
 
