@@ -1,11 +1,11 @@
 #!/bin/sh
 # Universal MCP Python Server Bootstrap
 # Detects platform and routes to appropriate implementation
-# Version: 1.2.6
+# Version: 1.2.7
 
 set -eu
 
-SCRIPT_VERSION="1.2.6"
+SCRIPT_VERSION="1.2.7"
 BASE_URL="${MCP_BOOTSTRAP_BASE_URL:-https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts}"
 CACHE_DIR="${MCP_BOOTSTRAP_CACHE_DIR:-${HOME}/.mcp/bootstrap-cache}"
 LOG_FILE="${HOME}/.mcp/bootstrap.log"
@@ -173,6 +173,12 @@ is_cache_fresh() {
         # Check for wrapper execution reporting
         if ! grep -q "Wrapper Execution Log" "$cache_file" 2>/dev/null; then
             log "Cache missing wrapper execution reporting - forcing refresh"
+            return 1
+        fi
+
+        # Check for stdio filtering fix (critical for MCP JSON-RPC communication)
+        if ! grep -q "startup_msg.*stderr" "$cache_file" 2>/dev/null; then
+            log "Cache missing critical stdio filtering for JSON-RPC - forcing refresh"
             return 1
         fi
     fi
