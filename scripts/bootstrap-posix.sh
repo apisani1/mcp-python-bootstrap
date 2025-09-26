@@ -171,7 +171,7 @@ detect_or_install_uvx() {
         fi
 
         warn "Installation attempt $attempt failed"
-        attempt=$((attempt + 1))
+        attempt=$(expr $attempt + 1)
 
         if [ $attempt -le $max_attempts ]; then
             log "Retrying in 5 seconds..."
