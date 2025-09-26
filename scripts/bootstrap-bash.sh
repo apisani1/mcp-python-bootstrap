@@ -1,11 +1,11 @@
 #!/bin/bash
 # Enhanced Bash MCP Python Server Bootstrap
 # Supports Linux, macOS, FreeBSD, WSL
-# Version: 1.2.5
+# Version: 1.2.6
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.2.5"
+SCRIPT_VERSION="1.2.6"
 
 # Parse arguments to handle --from syntax
 if [[ "${1:-}" == "--from" ]] && [[ $# -ge 3 ]]; then
@@ -483,8 +483,13 @@ fi
 # Debug: Show the exact command that will be executed
 echo "[Wrapper] About to execute: \$UVX_BINARY \$*" >&2
 
-# Execute with minimal wrapper overhead - try to replicate manual execution as closely as possible
-exec "\$UVX_BINARY" "\$@"
+# Filter startup message to stderr, pass JSON-RPC to stdout
+exec "\$UVX_BINARY" "\$@" | {
+    # Read the first line (startup message) and redirect to stderr
+    read -r startup_msg && echo "\$startup_msg" >&2
+    # Pass through all remaining output (JSON-RPC) to stdout
+    exec cat
+}
 EOF
 
         chmod +x /tmp/mcp_wrapper_$$.sh
