@@ -1,11 +1,11 @@
 #!/bin/sh
 # POSIX-compliant MCP Python Server Bootstrap
 # Supports Alpine Linux and minimal environments
-# Version: 1.2.5
+# Version: 1.2.6
 
 set -eu
 
-SCRIPT_VERSION="1.2.5"
+SCRIPT_VERSION="1.2.6"
 
 # Handle help and version first
 case "${1:-}" in
@@ -270,15 +270,53 @@ run_server() {
             error "curl is required to download GitHub raw URLs"
         fi
     else
-        # For PyPI/git packages, use uvx
+        # For PyPI/git packages, use uvx with filtering wrapper
+        log "Creating isolated execution environment..."
+
+        # Create wrapper script for clean MCP execution
+        cat > /tmp/mcp_wrapper_$$.sh << EOF
+#!/bin/sh
+# POSIX wrapper for MCP server execution
+
+# Use detected/installed uvx path
+UVX_BINARY="$UVX_PATH"
+
+# Environment setup
+export UV_CACHE_DIR="${UV_CACHE_DIR:-}"
+export UV_NO_MODIFY_PATH=1
+export PYTHONUNBUFFERED=1
+
+# Debug logging
+echo "[Wrapper] Starting uvx with args: \$*" >&2
+echo "[Wrapper] UVX_BINARY: \$UVX_BINARY" >&2
+
+# Test uvx availability
+if ! test -x "\$UVX_BINARY"; then
+    echo "[Wrapper] ERROR: uvx not found at \$UVX_BINARY" >&2
+    exit 127
+fi
+
+# Filter startup messages to stderr while preserving JSON-RPC pipe
+exec "\$UVX_BINARY" "\$@" | awk '
+/^Starting MCP/ {
+    print \$0 > "/dev/stderr";
+    fflush("/dev/stderr");
+    next
+}
+{
+    print \$0;
+    fflush()
+}'
+EOF
+
+        chmod +x /tmp/mcp_wrapper_$$.sh
+
         if [ "$USE_FROM_SYNTAX" = "true" ]; then
-            # Use --from syntax: uvx --from package_name executable_name [args...]
-            log "Executing: $UVX_PATH --from $PACKAGE_SPEC $EXECUTABLE_NAME $SCRIPT_ARGS"
-            exec "$UVX_PATH" --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" $SCRIPT_ARGS
+            log "Final command: /tmp/mcp_wrapper_$$.sh --from $PACKAGE_SPEC $EXECUTABLE_NAME $SCRIPT_ARGS"
+            exec /tmp/mcp_wrapper_$$.sh --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" $SCRIPT_ARGS
         else
-            # Regular uvx syntax
-            log "Executing: $UVX_PATH $PACKAGE_SPEC $SCRIPT_ARGS"
-            exec "$UVX_PATH" "$PACKAGE_SPEC" $SCRIPT_ARGS
+            log "Final command: /tmp/mcp_wrapper_$$.sh $PACKAGE_SPEC $SCRIPT_ARGS"
+            exec /tmp/mcp_wrapper_$$.sh "$PACKAGE_SPEC" $SCRIPT_ARGS
         fi
     fi
 }
