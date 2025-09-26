@@ -1,11 +1,11 @@
 #!/bin/sh
 # POSIX-compliant MCP Python Server Bootstrap
 # Supports Alpine Linux and minimal environments
-# Version: 1.2.0
+# Version: 1.2.5
 
 set -eu
 
-SCRIPT_VERSION="1.2.0"
+SCRIPT_VERSION="1.2.5"
 
 # Handle help and version first
 case "${1:-}" in

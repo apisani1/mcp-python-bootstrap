@@ -1,11 +1,11 @@
 #!/bin/bash
 # Enhanced Bash MCP Python Server Bootstrap
 # Supports Linux, macOS, FreeBSD, WSL
-# Version: 1.2.4
+# Version: 1.2.5
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.2.4"
+SCRIPT_VERSION="1.2.5"
 
 # Parse arguments to handle --from syntax
 if [[ "${1:-}" == "--from" ]] && [[ $# -ge 3 ]]; then
@@ -454,18 +454,17 @@ run_server_direct() {
 # Use the dynamically detected/installed uvx path
 UVX_BINARY="$UVX_PATH"
 
-# Clean environment setup for MCP server
-export UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/uv-cache}"
+# Minimal environment setup for MCP server
+export UV_CACHE_DIR="${UV_CACHE_DIR}"
 export UV_NO_MODIFY_PATH=1
-export TMPDIR="/tmp"
 
-# Ensure proper working directory for MCP server
-cd "\$HOME" || cd "/tmp"
+# Use user's home directory (like manual execution)
+cd "\$HOME"
 
-# Clear all signal handlers to prevent interference
+# Clear signal handlers
 trap - EXIT INT TERM HUP QUIT
 
-# Ensure line buffering for better I/O behavior
+# Python unbuffered for immediate output
 export PYTHONUNBUFFERED=1
 
 # Add debugging to wrapper - redirect to both stderr and a log file
@@ -479,18 +478,12 @@ if ! test -x "\$UVX_BINARY"; then
     exit 127
 fi
 
-# Test basic uvx functionality (quietly)
-"\$UVX_BINARY" --version >/tmp/mcp_wrapper.log 2>&1 || {
-    echo "[Wrapper] ERROR: uvx version check failed" >&2
-    exit 127
-}
+# Skip version check to minimize interference
 
-# Final debug message with exact command being executed
-echo "[Wrapper] Final command: \$UVX_BINARY \$*" >&2
-echo "[Wrapper] Starting MCP server with clean stdio..." >&2
+# Debug: Show the exact command that will be executed
+echo "[Wrapper] About to execute: \$UVX_BINARY \$*" >&2
 
-# Execute uvx with completely clean stdio for MCP server communication
-# The MCP server needs clean stdout for JSON-RPC, but stderr can be preserved for debugging
+# Execute with minimal wrapper overhead - try to replicate manual execution as closely as possible
 exec "\$UVX_BINARY" "\$@"
 EOF
 
