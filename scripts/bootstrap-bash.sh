@@ -478,28 +478,9 @@ echo "[Wrapper] Testing uvx --version..." | tee -a /tmp/mcp_wrapper.log >&2
 # Execute with clean process group and capture any exit code
 echo "[Wrapper] Executing uvx with full arguments..." | tee -a /tmp/mcp_wrapper.log >&2
 
-# Special handling for known packages that need module execution instead of entry points
-case "\$1" in
-    "--from")
-        case "\$2" in
-            "git+https://github.com/apisani1/test-mcp-server-ap25092201.git")
-                echo "[Wrapper] Using entry point execution for test-mcp-server-ap25092201..." | tee -a /tmp/mcp_wrapper.log >&2
-                # Execute with clean stdio for MCP - use the proper entry point
-                exec "\$UVX_BINARY" --from "\$2" test-mcp-server
-                ;;
-            *)
-                "\$UVX_BINARY" "\$@" 2>&1 | tee -a /tmp/mcp_wrapper.log
-                ;;
-        esac
-        ;;
-    *)
-        "\$UVX_BINARY" "\$@" 2>&1 | tee -a /tmp/mcp_wrapper.log
-        ;;
-esac
-
-exit_code=\$?
-echo "[Wrapper] uvx exited with code: \$exit_code" | tee -a /tmp/mcp_wrapper.log >&2
-exit \$exit_code
+# Execute uvx with clean stdio for MCP server communication
+echo "[Wrapper] Executing uvx with clean stdio for MCP..." | tee -a /tmp/mcp_wrapper.log >&2
+exec "\$UVX_BINARY" "\$@"
 EOF
 
         chmod +x /tmp/mcp_wrapper_$$.sh
