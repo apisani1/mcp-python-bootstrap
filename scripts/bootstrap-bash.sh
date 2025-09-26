@@ -1,11 +1,11 @@
 #!/bin/bash
 # Enhanced Bash MCP Python Server Bootstrap
 # Supports Linux, macOS, FreeBSD, WSL
-# Version: 1.3.0
+# Version: 1.3.1
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.0"
+SCRIPT_VERSION="1.3.1"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -560,17 +560,8 @@ fi
 # Debug: Show the exact command that will be executed
 echo "[Wrapper] About to execute: \$UVX_BINARY \$*" >&2
 
-# Filter startup messages to stderr while preserving JSON-RPC pipe
-exec "\$UVX_BINARY" "\$@" | awk '
-/^Starting MCP/ {
-    print \$0 > "/dev/stderr";
-    fflush("/dev/stderr");
-    next
-}
-{
-    print \$0;
-    fflush()
-}'
+# Execute uvx directly to preserve stdio for MCP communication
+exec "\$UVX_BINARY" "\$@"
 EOF
 
         chmod +x /tmp/mcp_wrapper_$$.sh

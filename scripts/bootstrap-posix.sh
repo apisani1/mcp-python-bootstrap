@@ -1,11 +1,11 @@
 #!/bin/sh
 # POSIX-compliant MCP Python Server Bootstrap
 # Supports Alpine Linux and minimal environments
-# Version: 1.3.0
+# Version: 1.3.1
 
 set -eu
 
-SCRIPT_VERSION="1.3.0"
+SCRIPT_VERSION="1.3.1"
 
 # Handle help and version first
 case "${1:-}" in
@@ -357,17 +357,8 @@ if ! test -x "\$UVX_BINARY"; then
     exit 127
 fi
 
-# Filter startup messages to stderr while preserving JSON-RPC pipe
-exec "\$UVX_BINARY" "\$@" | awk '
-/^Starting MCP/ {
-    print \$0 > "/dev/stderr";
-    fflush("/dev/stderr");
-    next
-}
-{
-    print \$0;
-    fflush()
-}'
+# Execute uvx directly to preserve stdio for MCP communication
+exec "\$UVX_BINARY" "\$@"
 EOF
 
         chmod +x /tmp/mcp_wrapper_$$.sh
