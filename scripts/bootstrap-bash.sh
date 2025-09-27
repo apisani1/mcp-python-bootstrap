@@ -1,11 +1,11 @@
 #!/bin/bash
 # Enhanced Bash MCP Python Server Bootstrap
 # Supports Linux, macOS, FreeBSD, WSL
-# Version: 1.3.6
+# Version: 1.3.7
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.6"
+SCRIPT_VERSION="1.3.7"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -556,113 +556,26 @@ run_server_direct() {
         log "Arguments: ${SCRIPT_ARGS[*]-}"
         log "Use from syntax: $USE_FROM_SYNTAX"
 
-        # Create completely isolated execution for MCP
-        log "Creating isolated execution environment..."
+        # Try direct execution first (like working Claude Desktop config)
+        log "Attempting direct uvx execution (matching working configuration)..."
 
-        # Create a wrapper script for completely clean execution with dynamic uvx path
-        cat > /tmp/mcp_wrapper_$$.sh << EOF
-#!/bin/bash
-# Complete isolation wrapper for MCP server
+        # Set minimal required environment
+        export UV_CACHE_DIR="${UV_CACHE_DIR}"
+        export PYTHONUNBUFFERED=1
 
-# Use the dynamically detected/installed uvx path
-UVX_BINARY="$UVX_PATH"
-
-# Enhanced environment setup for MCP server compatibility
-export UV_CACHE_DIR="${UV_CACHE_DIR}"
-export UV_NO_MODIFY_PATH=1
-
-# Inherit critical environment variables for FastMCP servers
-export HOME="${HOME:-/Users/\$(whoami)}"
-export USER="\${USER:-\$(whoami)}"
-export LOGNAME="\${LOGNAME:-\$(whoami)}"
-export SHELL="\${SHELL:-/bin/bash}"
-
-# Python environment variables
-export PYTHONUNBUFFERED=1
-export PYTHONDONTWRITEBYTECODE=1
-export PYTHONIOENCODING="utf-8"
-
-# FastMCP-specific debugging and asyncio flags
-export PYTHONDEBUG=1
-export PYTHONASYNCIODEBUG=1
-export PYTHONDEVMODE=1
-export PYTHON_TRACEMALLOC=1
-
-# FastMCP logging configuration
-export FASTMCP_DEBUG=1
-export FASTMCP_LOG_LEVEL="DEBUG"
-export MCP_LOG_LEVEL="DEBUG"
-
-# Path inheritance for tool access
-export PATH="\${PATH:-/usr/local/bin:/usr/bin:/bin}"
-
-# macOS-specific environment for GUI app compatibility
-export TMPDIR="\${TMPDIR:-/tmp}"
-export LANG="\${LANG:-en_US.UTF-8}"
-export LC_ALL="\${LC_ALL:-en_US.UTF-8}"
-
-# Use user's home directory (critical for FastMCP file access)
-cd "\$HOME" || cd /tmp
-
-# Clear signal handlers
-trap - EXIT INT TERM HUP QUIT
-
-# Debug environment inheritance
-echo "[Wrapper] Environment setup complete" >&2
-echo "[Wrapper] HOME=\$HOME" >&2
-echo "[Wrapper] USER=\$USER" >&2
-echo "[Wrapper] Working directory: \$(pwd)" >&2
-
-# Debug FastMCP-specific environment
-echo "[Wrapper] FastMCP debugging enabled:" >&2
-echo "[Wrapper] PYTHONDEBUG=\$PYTHONDEBUG" >&2
-echo "[Wrapper] PYTHONASYNCIODEBUG=\$PYTHONASYNCIODEBUG" >&2
-echo "[Wrapper] PYTHONDEVMODE=\$PYTHONDEVMODE" >&2
-echo "[Wrapper] FASTMCP_DEBUG=\$FASTMCP_DEBUG" >&2
-
-# Add debugging to wrapper - redirect to both stderr and a log file
-echo "[Wrapper] Starting uvx with args: \$*" | tee -a /tmp/mcp_wrapper.log >&2
-echo "[Wrapper] UVX_BINARY: \$UVX_BINARY" | tee -a /tmp/mcp_wrapper.log >&2
-echo "[Wrapper] UV_CACHE_DIR: \$UV_CACHE_DIR" | tee -a /tmp/mcp_wrapper.log >&2
-
-# Test if uvx command exists at detected/installed location
-if ! test -x "\$UVX_BINARY"; then
-    echo "[Wrapper] ERROR: uvx not found at \$UVX_BINARY" | tee -a /tmp/mcp_wrapper.log >&2
-    exit 127
-fi
-
-# Skip version check to minimize interference
-
-# Debug: Show the exact command that will be executed
-echo "[Wrapper] About to execute: \$UVX_BINARY \$*" >&2
-
-# Execute uvx directly to preserve stdio for MCP communication
-exec "\$UVX_BINARY" "\$@"
-EOF
-
-        chmod +x /tmp/mcp_wrapper_$$.sh
-
-        # Clear any previous wrapper log
-        rm -f /tmp/mcp_wrapper.log
+        # Change to user home directory
+        cd "$HOME" || cd /tmp
 
         if [[ "$USE_FROM_SYNTAX" == "true" ]]; then
-            # Clear uvx cache for this package to ensure latest version
-            log "Clearing uvx cache for package to ensure latest version..."
-            "$UVX_PATH" cache clean "$PACKAGE_SPEC" 2>/dev/null || true
+            log "Final command: $UVX_PATH --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
 
-            log "Final command: /tmp/mcp_wrapper_$$.sh --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
-
-            # Execute wrapper with clean exec for MCP
-            exec /tmp/mcp_wrapper_$$.sh --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"
+            # Execute uvx directly with clean exec for MCP (like working config)
+            exec "$UVX_PATH" --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"
         else
-            # Clear uvx cache for this package to ensure latest version
-            log "Clearing uvx cache for package to ensure latest version..."
-            "$UVX_PATH" cache clean "$PACKAGE_SPEC" 2>/dev/null || true
+            log "Final command: $UVX_PATH $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
 
-            log "Final command: /tmp/mcp_wrapper_$$.sh $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
-
-            # Execute wrapper with clean exec for MCP
-            exec /tmp/mcp_wrapper_$$.sh "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
+            # Execute uvx directly with clean exec for MCP
+            exec "$UVX_PATH" "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
         fi
     fi
 }
