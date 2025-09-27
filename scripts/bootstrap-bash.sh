@@ -1,11 +1,11 @@
 #!/bin/bash
 # Enhanced Bash MCP Python Server Bootstrap
 # Supports Linux, macOS, FreeBSD, WSL
-# Version: 1.3.4
+# Version: 1.3.5
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.4"
+SCRIPT_VERSION="1.3.5"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -127,22 +127,44 @@ check_network() {
 # Detect existing uvx or install in isolated environment
 # Sets global UVX_PATH variable to absolute path of uvx
 detect_or_install_uvx() {
-    log "Detecting or installing uvx (non-invasive approach)..."
+    log "Detecting or installing uvx (intelligent preference approach)..."
 
-    # Phase 1: Try to detect existing uvx installation
+    # Phase 1: Try to detect existing uvx installation (prefer user installation)
     if UVX_PATH=$(command -v uvx 2>/dev/null); then
         local version
         if version=$("$UVX_PATH" --version 2>/dev/null); then
             log "Found existing uvx at: $UVX_PATH"
             log "Version: $version"
-            return 0
+
+            # Test if this uvx can actually run our test package to avoid environment issues
+            log "Testing existing uvx compatibility..."
+            if "$UVX_PATH" --help >/dev/null 2>&1; then
+                log "Existing uvx is compatible, using user installation (preferred for environment compatibility)"
+                return 0
+            else
+                warn "Existing uvx failed compatibility test, will use isolated installation"
+            fi
         else
             warn "uvx found at $UVX_PATH but not working properly"
         fi
     fi
 
-    # Phase 2: No working uvx found, install in isolated environment
-    log "No working uvx found, installing in isolated environment..."
+    # Phase 2: Check if uv is available and use it instead of isolated installation
+    if command -v uv >/dev/null 2>&1; then
+        local uv_version
+        if uv_version=$(uv --version 2>/dev/null); then
+            log "Found existing uv installation: $uv_version"
+            log "Using existing uv ecosystem instead of isolated installation (better environment compatibility)"
+
+            # Set UVX_PATH to use the system uv with explicit tool execution
+            UVX_PATH="$(command -v uv)"
+            return 0
+        fi
+    fi
+
+    # Phase 3: No working uvx/uv found, install in isolated environment as last resort
+    log "No compatible uvx/uv found, installing in isolated environment..."
+    log "Note: Isolated installations may have environment compatibility issues"
 
     # Create isolated installation directory
     local isolated_dir="/tmp/mcp-bootstrap-$$"
@@ -531,18 +553,58 @@ run_server_direct() {
 # Use the dynamically detected/installed uvx path
 UVX_BINARY="$UVX_PATH"
 
-# Minimal environment setup for MCP server
+# Enhanced environment setup for MCP server compatibility
 export UV_CACHE_DIR="${UV_CACHE_DIR}"
 export UV_NO_MODIFY_PATH=1
 
-# Use user's home directory (like manual execution)
-cd "\$HOME"
+# Inherit critical environment variables for FastMCP servers
+export HOME="${HOME:-/Users/\$(whoami)}"
+export USER="\${USER:-\$(whoami)}"
+export LOGNAME="\${LOGNAME:-\$(whoami)}"
+export SHELL="\${SHELL:-/bin/bash}"
+
+# Python environment variables
+export PYTHONUNBUFFERED=1
+export PYTHONDONTWRITEBYTECODE=1
+export PYTHONIOENCODING="utf-8"
+
+# FastMCP-specific debugging and asyncio flags
+export PYTHONDEBUG=1
+export PYTHONASYNCIODEBUG=1
+export PYTHONDEVMODE=1
+export PYTHON_TRACEMALLOC=1
+
+# FastMCP logging configuration
+export FASTMCP_DEBUG=1
+export FASTMCP_LOG_LEVEL="DEBUG"
+export MCP_LOG_LEVEL="DEBUG"
+
+# Path inheritance for tool access
+export PATH="\${PATH:-/usr/local/bin:/usr/bin:/bin}"
+
+# macOS-specific environment for GUI app compatibility
+export TMPDIR="\${TMPDIR:-/tmp}"
+export LANG="\${LANG:-en_US.UTF-8}"
+export LC_ALL="\${LC_ALL:-en_US.UTF-8}"
+
+# Use user's home directory (critical for FastMCP file access)
+cd "\$HOME" || cd /tmp
 
 # Clear signal handlers
 trap - EXIT INT TERM HUP QUIT
 
-# Python unbuffered for immediate output
-export PYTHONUNBUFFERED=1
+# Debug environment inheritance
+echo "[Wrapper] Environment setup complete" >&2
+echo "[Wrapper] HOME=\$HOME" >&2
+echo "[Wrapper] USER=\$USER" >&2
+echo "[Wrapper] Working directory: \$(pwd)" >&2
+
+# Debug FastMCP-specific environment
+echo "[Wrapper] FastMCP debugging enabled:" >&2
+echo "[Wrapper] PYTHONDEBUG=\$PYTHONDEBUG" >&2
+echo "[Wrapper] PYTHONASYNCIODEBUG=\$PYTHONASYNCIODEBUG" >&2
+echo "[Wrapper] PYTHONDEVMODE=\$PYTHONDEVMODE" >&2
+echo "[Wrapper] FASTMCP_DEBUG=\$FASTMCP_DEBUG" >&2
 
 # Add debugging to wrapper - redirect to both stderr and a log file
 echo "[Wrapper] Starting uvx with args: \$*" | tee -a /tmp/mcp_wrapper.log >&2
