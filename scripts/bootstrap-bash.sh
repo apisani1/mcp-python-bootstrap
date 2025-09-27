@@ -1,11 +1,11 @@
 #!/bin/bash
 # Enhanced Bash MCP Python Server Bootstrap
 # Supports Linux, macOS, FreeBSD, WSL
-# Version: 1.3.1
+# Version: 1.3.2
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.1"
+SCRIPT_VERSION="1.3.2"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -535,8 +535,9 @@ UVX_BINARY="$UVX_PATH"
 export UV_CACHE_DIR="${UV_CACHE_DIR}"
 export UV_NO_MODIFY_PATH=1
 
-# Use user's home directory (like manual execution)
+# Use user's home directory (like manual execution) and ensure stdin is available
 cd "\$HOME"
+echo "[Wrapper] Working directory: \$(pwd)" >&2
 
 # Clear signal handlers
 trap - EXIT INT TERM HUP QUIT
@@ -561,6 +562,11 @@ fi
 echo "[Wrapper] About to execute: \$UVX_BINARY \$*" >&2
 
 # Execute uvx directly to preserve stdio for MCP communication
+# Add debugging for stdin/stdout
+echo "[Wrapper] Stdin is: \$([ -t 0 ] && echo 'terminal' || echo 'pipe')" >&2
+echo "[Wrapper] Stdout is: \$([ -t 1 ] && echo 'terminal' || echo 'pipe')" >&2
+echo "[Wrapper] Starting server..." >&2
+
 exec "\$UVX_BINARY" "\$@"
 EOF
 
