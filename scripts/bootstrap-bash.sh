@@ -1,11 +1,11 @@
 #!/bin/bash
 # Enhanced Bash MCP Python Server Bootstrap
 # Supports Linux, macOS, FreeBSD, WSL
-# Version: 1.3.9
+# Version: 1.3.10
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.9"
+SCRIPT_VERSION="1.3.10"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -649,8 +649,34 @@ run_server_direct() {
             fi
             log "uvx help test passed successfully"
 
-            # Execute uvx directly with clean exec for MCP (like working config)
-            exec "$UVX_PATH" --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"
+            # Test the actual command that will be executed
+            log "Testing actual uvx command before exec..."
+            log "About to execute: $UVX_PATH --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
+
+            # Create a debug wrapper to capture any issues
+            log "Creating debug execution wrapper..."
+            cat > /tmp/uvx_debug_$$.sh << EOF
+#!/bin/bash
+# Debug wrapper for uvx execution
+set -euo pipefail
+
+echo "[UVX-DEBUG] Starting uvx execution at \$(date)" >&2
+echo "[UVX-DEBUG] Working directory: \$(pwd)" >&2
+echo "[UVX-DEBUG] Arguments: \$*" >&2
+echo "[UVX-DEBUG] Environment check:" >&2
+echo "[UVX-DEBUG] PATH=\$PATH" >&2
+echo "[UVX-DEBUG] HOME=\$HOME" >&2
+echo "[UVX-DEBUG] UV_CACHE_DIR=\$UV_CACHE_DIR" >&2
+
+# Execute uvx with all arguments, preserving exact behavior
+echo "[UVX-DEBUG] Executing: $UVX_PATH \$*" >&2
+exec "$UVX_PATH" "\$@"
+EOF
+            chmod +x /tmp/uvx_debug_$$.sh
+
+            # Execute with debug wrapper to capture any issues
+            log "Executing with debug wrapper: /tmp/uvx_debug_$$.sh --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
+            exec /tmp/uvx_debug_$$.sh --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"
         else
             log "Final command: $UVX_PATH $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
 
@@ -663,8 +689,30 @@ run_server_direct() {
             fi
             log "uvx help test passed successfully"
 
+            # Create debug wrapper for non --from syntax as well
+            log "Creating debug execution wrapper (non --from syntax)..."
+            cat > /tmp/uvx_debug_$$.sh << EOF
+#!/bin/bash
+# Debug wrapper for uvx execution
+set -euo pipefail
+
+echo "[UVX-DEBUG] Starting uvx execution at \$(date)" >&2
+echo "[UVX-DEBUG] Working directory: \$(pwd)" >&2
+echo "[UVX-DEBUG] Arguments: \$*" >&2
+echo "[UVX-DEBUG] Environment check:" >&2
+echo "[UVX-DEBUG] PATH=\$PATH" >&2
+echo "[UVX-DEBUG] HOME=\$HOME" >&2
+echo "[UVX-DEBUG] UV_CACHE_DIR=\$UV_CACHE_DIR" >&2
+
+# Execute uvx with all arguments, preserving exact behavior
+echo "[UVX-DEBUG] Executing: $UVX_PATH \$*" >&2
+exec "$UVX_PATH" "\$@"
+EOF
+            chmod +x /tmp/uvx_debug_$$.sh
+
             # Execute uvx directly with clean exec for MCP
-            exec "$UVX_PATH" "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
+            log "Executing with debug wrapper: /tmp/uvx_debug_$$.sh $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
+            exec /tmp/uvx_debug_$$.sh "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
         fi
     fi
 }
