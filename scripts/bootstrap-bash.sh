@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.11"
+SCRIPT_VERSION="1.3.12"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -648,6 +648,12 @@ run_server_direct() {
                 error "uvx environment incompatible - cannot execute basic commands"
             fi
             log "uvx help test passed successfully"
+
+            # Fix potential TERM environment issue that might affect FastMCP
+            if [[ "$TERM" == "dumb" ]]; then
+                log "Fixing TERM environment from 'dumb' to 'xterm-256color' for FastMCP compatibility"
+                export TERM="xterm-256color"
+            fi
 
             # Execute uvx directly without any wrapper to match working config exactly
             log "Final command: $UVX_PATH --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
