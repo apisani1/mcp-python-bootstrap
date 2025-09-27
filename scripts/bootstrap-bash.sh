@@ -1,11 +1,11 @@
 #!/bin/bash
 # Enhanced Bash MCP Python Server Bootstrap
 # Supports Linux, macOS, FreeBSD, WSL
-# Version: 1.3.11
+# Version: 1.3.13
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.12"
+SCRIPT_VERSION="1.3.13"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -625,8 +625,8 @@ run_server_direct() {
         export TERM="${TERM:-xterm-256color}"
         export SHELL="${SHELL:-/bin/bash}"
 
-        # Change to user home directory
-        cd "$HOME" || cd /tmp
+        # Change to root directory to match direct uvx behavior (working config shows working directory: /)
+        cd / || cd /tmp
 
         # Additional debugging: capture uvx stderr before exec
         log "Environment test: PATH=$PATH"

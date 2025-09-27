@@ -1,11 +1,11 @@
 #!/bin/sh
 # Universal MCP Python Server Bootstrap
 # Detects platform and routes to appropriate implementation
-# Version: 1.3.7
+# Version: 1.3.13
 
 set -eu
 
-SCRIPT_VERSION="1.3.7"
+SCRIPT_VERSION="1.3.13"
 BASE_URL="${MCP_BOOTSTRAP_BASE_URL:-https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts}"
 CACHE_DIR="${MCP_BOOTSTRAP_CACHE_DIR:-${HOME}/.mcp/bootstrap-cache}"
 LOG_FILE="${HOME}/.mcp/bootstrap.log"
@@ -227,6 +227,12 @@ is_cache_fresh() {
         # Check for direct uvx execution (version 1.3.7)
         if ! grep -q "direct uvx execution" "$cache_file" 2>/dev/null; then
             log "Cache missing direct uvx execution approach - forcing refresh"
+            return 1
+        fi
+
+        # Check for working directory fix to match direct uvx behavior (version 1.3.13)
+        if ! grep -q "Change to root directory to match direct uvx behavior" "$cache_file" 2>/dev/null; then
+            log "Cache missing critical working directory fix for FastMCP compatibility - forcing refresh"
             return 1
         fi
     fi
