@@ -1,11 +1,11 @@
 #!/bin/bash
 # Enhanced Bash MCP Python Server Bootstrap
 # Supports Linux, macOS, FreeBSD, WSL
-# Version: 1.3.2
+# Version: 1.3.4
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.2"
+SCRIPT_VERSION="1.3.4"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -535,9 +535,8 @@ UVX_BINARY="$UVX_PATH"
 export UV_CACHE_DIR="${UV_CACHE_DIR}"
 export UV_NO_MODIFY_PATH=1
 
-# Use user's home directory (like manual execution) and ensure stdin is available
+# Use user's home directory (like manual execution)
 cd "\$HOME"
-echo "[Wrapper] Working directory: \$(pwd)" >&2
 
 # Clear signal handlers
 trap - EXIT INT TERM HUP QUIT
@@ -562,11 +561,6 @@ fi
 echo "[Wrapper] About to execute: \$UVX_BINARY \$*" >&2
 
 # Execute uvx directly to preserve stdio for MCP communication
-# Add debugging for stdin/stdout
-echo "[Wrapper] Stdin is: \$([ -t 0 ] && echo 'terminal' || echo 'pipe')" >&2
-echo "[Wrapper] Stdout is: \$([ -t 1 ] && echo 'terminal' || echo 'pipe')" >&2
-echo "[Wrapper] Starting server..." >&2
-
 exec "\$UVX_BINARY" "\$@"
 EOF
 
@@ -576,11 +570,19 @@ EOF
         rm -f /tmp/mcp_wrapper.log
 
         if [[ "$USE_FROM_SYNTAX" == "true" ]]; then
+            # Clear uvx cache for this package to ensure latest version
+            log "Clearing uvx cache for package to ensure latest version..."
+            "$UVX_PATH" cache clean "$PACKAGE_SPEC" 2>/dev/null || true
+
             log "Final command: /tmp/mcp_wrapper_$$.sh --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
 
             # Execute wrapper with clean exec for MCP
             exec /tmp/mcp_wrapper_$$.sh --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"
         else
+            # Clear uvx cache for this package to ensure latest version
+            log "Clearing uvx cache for package to ensure latest version..."
+            "$UVX_PATH" cache clean "$PACKAGE_SPEC" 2>/dev/null || true
+
             log "Final command: /tmp/mcp_wrapper_$$.sh $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
 
             # Execute wrapper with clean exec for MCP
