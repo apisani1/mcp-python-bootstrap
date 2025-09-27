@@ -1,11 +1,11 @@
 #!/bin/bash
 # Enhanced Bash MCP Python Server Bootstrap
 # Supports Linux, macOS, FreeBSD, WSL
-# Version: 1.3.7
+# Version: 1.3.8
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.7"
+SCRIPT_VERSION="1.3.8"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -559,20 +559,72 @@ run_server_direct() {
         # Try direct execution first (like working Claude Desktop config)
         log "Attempting direct uvx execution (matching working configuration)..."
 
+        # Debug: Test if uvx actually works in this environment
+        log "Testing uvx in current environment..."
+        if ! "$UVX_PATH" --version >/dev/null 2>&1; then
+            warn "uvx version check failed in current environment, falling back to isolated installation"
+            # Fall back to isolated installation directly without recursive call
+            log "Installing isolated uvx due to environment incompatibility..."
+
+            # Create isolated installation directory
+            local isolated_dir="/tmp/mcp-bootstrap-fallback-$$"
+            mkdir -p "$isolated_dir"
+
+            # Install uv in isolated mode
+            export UV_INSTALL_DIR="$isolated_dir"
+            export UV_CACHE_DIR="$isolated_dir/cache"
+            export UV_NO_MODIFY_PATH=1
+
+            if command_exists curl; then
+                curl -LsSf https://astral.sh/uv/install.sh | sh -s -- --no-modify-path >&2
+            else
+                error "curl required for isolated uvx installation"
+            fi
+
+            # Find the installed uvx
+            if [[ -x "$isolated_dir/uvx" ]]; then
+                UVX_PATH="$isolated_dir/uvx"
+            elif [[ -x "$isolated_dir/bin/uvx" ]]; then
+                UVX_PATH="$isolated_dir/bin/uvx"
+            else
+                error "Failed to install uvx in isolated environment"
+            fi
+
+            log "Isolated uvx installed at: $UVX_PATH"
+        fi
+
         # Set minimal required environment
         export UV_CACHE_DIR="${UV_CACHE_DIR}"
         export PYTHONUNBUFFERED=1
+        export PATH="$HOME/.local/bin:$PATH"  # Ensure uvx location is in PATH
 
         # Change to user home directory
         cd "$HOME" || cd /tmp
 
+        # Additional debugging: capture uvx stderr before exec
+        log "Environment test: PATH=$PATH"
+        log "Environment test: HOME=$HOME"
+        log "Environment test: USER=$USER"
+
         if [[ "$USE_FROM_SYNTAX" == "true" ]]; then
             log "Final command: $UVX_PATH --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
+
+            # Test command before exec to catch issues
+            log "Testing command execution..."
+            if ! "$UVX_PATH" --help >/dev/null 2>&1; then
+                error "uvx command failed basic help test - environment incompatible"
+            fi
 
             # Execute uvx directly with clean exec for MCP (like working config)
             exec "$UVX_PATH" --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"
         else
             log "Final command: $UVX_PATH $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
+
+            # Test command before exec to catch issues
+            log "Testing command execution..."
+            if ! "$UVX_PATH" --help >/dev/null 2>&1; then
+                error "uvx command failed basic help test - environment incompatible"
+            fi
 
             # Execute uvx directly with clean exec for MCP
             exec "$UVX_PATH" "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
