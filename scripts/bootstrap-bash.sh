@@ -1,11 +1,11 @@
 #!/bin/bash
 # Enhanced Bash MCP Python Server Bootstrap
 # Supports Linux, macOS, FreeBSD, WSL
-# Version: 1.3.8
+# Version: 1.3.9
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.8"
+SCRIPT_VERSION="1.3.9"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -593,10 +593,37 @@ run_server_direct() {
             log "Isolated uvx installed at: $UVX_PATH"
         fi
 
-        # Set minimal required environment
+        # Set comprehensive environment for uvx compatibility
         export UV_CACHE_DIR="${UV_CACHE_DIR}"
         export PYTHONUNBUFFERED=1
         export PATH="$HOME/.local/bin:$PATH"  # Ensure uvx location is in PATH
+
+        # Critical macOS dynamic library environment variables (known uvx issue)
+        export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-}"
+        export DYLD_FALLBACK_LIBRARY_PATH="${DYLD_FALLBACK_LIBRARY_PATH:-/usr/local/lib:/opt/homebrew/lib:/usr/lib}"
+        export DYLD_FRAMEWORK_PATH="${DYLD_FRAMEWORK_PATH:-}"
+        export DYLD_FALLBACK_FRAMEWORK_PATH="${DYLD_FALLBACK_FRAMEWORK_PATH:-/usr/local/Frameworks:/opt/homebrew/Frameworks:/System/Library/Frameworks}"
+
+        # Linux equivalent library paths
+        export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}"
+
+        # Homebrew environment variables (critical for macOS)
+        export HOMEBREW_PREFIX="${HOMEBREW_PREFIX:-/opt/homebrew}"
+        export HOMEBREW_CELLAR="${HOMEBREW_CELLAR:-/opt/homebrew/Cellar}"
+        export HOMEBREW_REPOSITORY="${HOMEBREW_REPOSITORY:-/opt/homebrew}"
+
+        # Python and development environment
+        export LANG="${LANG:-en_US.UTF-8}"
+        export LC_ALL="${LC_ALL:-en_US.UTF-8}"
+        export TMPDIR="${TMPDIR:-/tmp}"
+
+        # Development tools environment
+        export PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-/opt/homebrew/lib/pkgconfig:/usr/local/lib/pkgconfig}"
+        export CMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH:-/opt/homebrew:/usr/local}"
+
+        # Shell and terminal environment
+        export TERM="${TERM:-xterm-256color}"
+        export SHELL="${SHELL:-/bin/bash}"
 
         # Change to user home directory
         cd "$HOME" || cd /tmp
@@ -605,15 +632,22 @@ run_server_direct() {
         log "Environment test: PATH=$PATH"
         log "Environment test: HOME=$HOME"
         log "Environment test: USER=$USER"
+        log "Environment test: DYLD_FALLBACK_LIBRARY_PATH=$DYLD_FALLBACK_LIBRARY_PATH"
+        log "Environment test: HOMEBREW_PREFIX=$HOMEBREW_PREFIX"
+        log "Environment test: LANG=$LANG"
+        log "Environment test: TERM=$TERM"
 
         if [[ "$USE_FROM_SYNTAX" == "true" ]]; then
             log "Final command: $UVX_PATH --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
 
             # Test command before exec to catch issues
             log "Testing command execution..."
-            if ! "$UVX_PATH" --help >/dev/null 2>&1; then
-                error "uvx command failed basic help test - environment incompatible"
+            local uvx_error
+            if ! uvx_error=$("$UVX_PATH" --help 2>&1); then
+                warn "uvx command failed basic help test. Error: $uvx_error"
+                error "uvx environment incompatible - cannot execute basic commands"
             fi
+            log "uvx help test passed successfully"
 
             # Execute uvx directly with clean exec for MCP (like working config)
             exec "$UVX_PATH" --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"
@@ -622,9 +656,12 @@ run_server_direct() {
 
             # Test command before exec to catch issues
             log "Testing command execution..."
-            if ! "$UVX_PATH" --help >/dev/null 2>&1; then
-                error "uvx command failed basic help test - environment incompatible"
+            local uvx_error
+            if ! uvx_error=$("$UVX_PATH" --help 2>&1); then
+                warn "uvx command failed basic help test. Error: $uvx_error"
+                error "uvx environment incompatible - cannot execute basic commands"
             fi
+            log "uvx help test passed successfully"
 
             # Execute uvx directly with clean exec for MCP
             exec "$UVX_PATH" "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
