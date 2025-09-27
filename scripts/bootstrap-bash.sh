@@ -1,11 +1,11 @@
 #!/bin/bash
 # Enhanced Bash MCP Python Server Bootstrap
 # Supports Linux, macOS, FreeBSD, WSL
-# Version: 1.3.5
+# Version: 1.3.6
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.5"
+SCRIPT_VERSION="1.3.6"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -130,24 +130,38 @@ detect_or_install_uvx() {
     log "Detecting or installing uvx (intelligent preference approach)..."
 
     # Phase 1: Try to detect existing uvx installation (prefer user installation)
-    if UVX_PATH=$(command -v uvx 2>/dev/null); then
-        local version
-        if version=$("$UVX_PATH" --version 2>/dev/null); then
-            log "Found existing uvx at: $UVX_PATH"
-            log "Version: $version"
+    # Check both PATH and common installation locations
+    local uvx_candidates=(
+        "$(command -v uvx 2>/dev/null)"
+        "$HOME/.local/bin/uvx"
+        "$HOME/.cargo/bin/uvx"
+        "/usr/local/bin/uvx"
+        "/opt/homebrew/bin/uvx"
+    )
 
-            # Test if this uvx can actually run our test package to avoid environment issues
-            log "Testing existing uvx compatibility..."
-            if "$UVX_PATH" --help >/dev/null 2>&1; then
-                log "Existing uvx is compatible, using user installation (preferred for environment compatibility)"
-                return 0
+    for candidate in "${uvx_candidates[@]}"; do
+        if [[ -n "$candidate" && -x "$candidate" ]]; then
+            UVX_PATH="$candidate"
+            local version
+            if version=$("$UVX_PATH" --version 2>/dev/null); then
+                log "Found existing uvx at: $UVX_PATH"
+                log "Version: $version"
+
+                # Test if this uvx can actually run our test package to avoid environment issues
+                log "Testing existing uvx compatibility..."
+                if "$UVX_PATH" --help >/dev/null 2>&1; then
+                    log "Existing uvx is compatible, using user installation (preferred for environment compatibility)"
+                    return 0
+                else
+                    warn "uvx at $UVX_PATH failed compatibility test, trying next candidate..."
+                fi
             else
-                warn "Existing uvx failed compatibility test, will use isolated installation"
+                log "uvx found at $UVX_PATH but version check failed, trying next candidate..."
             fi
-        else
-            warn "uvx found at $UVX_PATH but not working properly"
         fi
-    fi
+    done
+
+    log "No compatible uvx found in common locations"
 
     # Phase 2: Check if uv is available and use it instead of isolated installation
     if command -v uv >/dev/null 2>&1; then
