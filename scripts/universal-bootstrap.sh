@@ -1,11 +1,11 @@
 #!/bin/sh
 # Universal MCP Python Server Bootstrap
 # Detects platform and routes to appropriate implementation
-# Version: 1.3.15
+# Version: 1.3.16
 
 set -eu
 
-SCRIPT_VERSION="1.3.15"
+SCRIPT_VERSION="1.3.16"
 BASE_URL="${MCP_BOOTSTRAP_BASE_URL:-https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts}"
 CACHE_DIR="${MCP_BOOTSTRAP_CACHE_DIR:-${HOME}/.mcp/bootstrap-cache}"
 LOG_FILE="${HOME}/.mcp/bootstrap.log"
@@ -245,6 +245,12 @@ is_cache_fresh() {
         # Check for comprehensive process debugging (version 1.3.15)
         if ! grep -q "Process Relationship Debug Info" "$cache_file" 2>/dev/null; then
             log "Cache missing comprehensive process debugging for lifecycle analysis - forcing refresh"
+            return 1
+        fi
+
+        # Check for smart bypass logic (version 1.3.16)
+        if ! grep -q "smart_bypass_to_uvx" "$cache_file" 2>/dev/null; then
+            log "Cache missing smart bypass logic for transparent uvx execution - forcing refresh"
             return 1
         fi
     fi

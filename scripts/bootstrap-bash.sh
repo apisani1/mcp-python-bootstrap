@@ -1,11 +1,11 @@
 #!/bin/bash
 # Enhanced Bash MCP Python Server Bootstrap
 # Supports Linux, macOS, FreeBSD, WSL
-# Version: 1.3.15
+# Version: 1.3.16
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.15"
+SCRIPT_VERSION="1.3.16"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -24,6 +24,61 @@ else
     SCRIPT_ARGS=("${@:2}")
     USE_FROM_SYNTAX=false
     # Auto-detection will happen later in init_arguments() after functions are defined
+fi
+
+# SMART BYPASS: If uvx exists and works, exec directly to skip all bootstrap logic
+# This makes the execution identical to direct uvx configuration
+smart_bypass_to_uvx() {
+    # Quick uvx detection without any logging or setup
+    local uvx_candidates=(
+        "$(command -v uvx 2>/dev/null)"
+        "$HOME/.local/bin/uvx"
+        "/usr/local/bin/uvx"
+        "/opt/homebrew/bin/uvx"
+    )
+
+    for uvx_path in "${uvx_candidates[@]}"; do
+        if [[ -n "$uvx_path" && -x "$uvx_path" ]]; then
+            # Test if uvx works (quick check)
+            if "$uvx_path" --version >/dev/null 2>&1; then
+                # uvx works - exec directly with original arguments
+                # This creates identical process chain to direct uvx: Claude Desktop → uvx → FastMCP
+
+                if [[ "$USE_FROM_SYNTAX" == "true" ]]; then
+                    exec "$uvx_path" --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"
+                else
+                    # Auto-detect executable name quickly
+                    local executable_name=""
+                    case "$PACKAGE_SPEC" in
+                        git+*)
+                            local repo_name=$(echo "$PACKAGE_SPEC" | sed -E 's|git\+https?://[^/]+/[^/]+/([^/]+)(\.git)?.*|\1|')
+                            case "$repo_name" in
+                                *-[a-z][a-z][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9])
+                                    executable_name=$(echo "$repo_name" | sed -E 's/-[a-z][a-z][0-9]{8}$//')
+                                    ;;
+                                *)
+                                    executable_name="$repo_name"
+                                    ;;
+                            esac
+                            if [[ -n "$executable_name" && "$executable_name" != "$repo_name" ]]; then
+                                exec "$uvx_path" --from "$PACKAGE_SPEC" "$executable_name" "${SCRIPT_ARGS[@]:-}"
+                            else
+                                exec "$uvx_path" "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
+                            fi
+                            ;;
+                        *)
+                            exec "$uvx_path" "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
+                            ;;
+                    esac
+                fi
+            fi
+        fi
+    done
+}
+
+# Execute smart bypass if package spec is provided
+if [[ -n "${PACKAGE_SPEC:-}" ]]; then
+    smart_bypass_to_uvx
 fi
 
 # Configuration
