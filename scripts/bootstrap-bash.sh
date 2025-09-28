@@ -1,11 +1,11 @@
 #!/bin/bash
 # Enhanced Bash MCP Python Server Bootstrap
 # Supports Linux, macOS, FreeBSD, WSL
-# Version: 1.3.13
+# Version: 1.3.14
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.13"
+SCRIPT_VERSION="1.3.14"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -649,11 +649,8 @@ run_server_direct() {
             fi
             log "uvx help test passed successfully"
 
-            # Fix potential TERM environment issue that might affect FastMCP
-            if [[ "$TERM" == "dumb" ]]; then
-                log "Fixing TERM environment from 'dumb' to 'xterm-256color' for FastMCP compatibility"
-                export TERM="xterm-256color"
-            fi
+            # Keep TERM environment as-is to match direct uvx behavior
+            log "Preserving TERM environment: $TERM (matching direct uvx behavior)"
 
             # Execute uvx directly without any wrapper to match working config exactly
             log "Final command: $UVX_PATH --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
