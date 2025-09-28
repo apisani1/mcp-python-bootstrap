@@ -1,11 +1,11 @@
 #!/bin/bash
 # Enhanced Bash MCP Python Server Bootstrap
 # Supports Linux, macOS, FreeBSD, WSL
-# Version: 1.3.14
+# Version: 1.3.15
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.14"
+SCRIPT_VERSION="1.3.15"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -651,6 +651,27 @@ run_server_direct() {
 
             # Keep TERM environment as-is to match direct uvx behavior
             log "Preserving TERM environment: $TERM (matching direct uvx behavior)"
+
+            # Debug: Comprehensive process relationship analysis
+            log "=== Process Relationship Debug Info ==="
+            log "Current PID: $$"
+            log "Parent PID: $PPID"
+            log "Process Group ID: $(ps -o pgid= -p $$)"
+            log "Session ID: $(ps -o sid= -p $$)"
+            log "Process Tree: $(ps -o pid,ppid,pgid,sid,comm | grep -E '($$|'$PPID'|bash|uvx|python)')"
+
+            # Debug: Stdin file descriptor analysis
+            log "=== Stdin Characteristics Analysis ==="
+            log "Stdin file descriptor: 0"
+            log "Stdin file type: $(file /proc/self/fd/0 2>/dev/null || echo 'unknown')"
+            log "Stdin stat info: $(stat /proc/self/fd/0 2>/dev/null || stat /dev/fd/0 2>/dev/null || echo 'stat unavailable')"
+            log "Shell stdin check: $(if [[ -t 0 ]]; then echo 'terminal'; else echo 'pipe/redirect'; fi)"
+
+            # Debug: Signal and session context
+            log "=== Signal and Session Context ==="
+            log "Signal mask: $(kill -l 2>/dev/null | head -5 || echo 'signal list unavailable')"
+            log "Controlling terminal: $(ps -o tty -p $$ | tail -1)"
+            log "Process environment size: $(env | wc -l)"
 
             # Execute uvx directly without any wrapper to match working config exactly
             log "Final command: $UVX_PATH --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
