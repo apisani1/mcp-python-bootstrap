@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.16"
+SCRIPT_VERSION="1.3.17"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -227,6 +227,8 @@ detect_or_install_uvx() {
 
             # Set UVX_PATH to use the system uv with explicit tool execution
             UVX_PATH="$(command -v uv)"
+            # Flag to indicate we're using uv, not uvx (affects syntax)
+            export USING_UV_FALLBACK=true
             return 0
         fi
     fi
@@ -729,15 +731,25 @@ run_server_direct() {
             log "Process environment size: $(env | wc -l)"
 
             # Execute uvx directly without any wrapper to match working config exactly
-            log "Final command: $UVX_PATH --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
-            log "Process replacement: Using exec to replace current process with uvx (like direct config)"
-
-            # Execute uvx directly with clean exec for MCP (exactly like working config)
-            exec "$UVX_PATH" --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"
+            if [[ "${USING_UV_FALLBACK:-false}" == "true" ]]; then
+                log "Final command: $UVX_PATH run --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
+                log "Process replacement: Using exec to replace current process with uv run (uv fallback)"
+                exec "$UVX_PATH" run --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"
+            else
+                log "Final command: $UVX_PATH --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
+                log "Process replacement: Using exec to replace current process with uvx (like direct config)"
+                exec "$UVX_PATH" --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"
+            fi
         else
-            log "Final command: $UVX_PATH $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
-
-            # Test command before exec to catch issues
+            if [[ "${USING_UV_FALLBACK:-false}" == "true" ]]; then
+                log "Final command: $UVX_PATH run $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
+                log "Process replacement: Using exec to replace current process with uv run (uv fallback)"
+                exec "$UVX_PATH" run "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
+            else
+                log "Final command: $UVX_PATH $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
+                log "Process replacement: Using exec to replace current process with uvx (like direct config)"
+                exec "$UVX_PATH" "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
+            fi
             log "Testing command execution..."
             local uvx_error
             if ! uvx_error=$("$UVX_PATH" --help 2>&1); then
