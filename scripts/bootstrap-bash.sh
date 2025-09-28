@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.18"
+SCRIPT_VERSION="1.3.19"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -218,12 +218,14 @@ detect_or_install_uvx() {
 
     log "No compatible uvx found in common locations"
 
-    # Phase 2: Check if uv is available and use it instead of isolated installation
+    # Phase 2: Check if uv is available but uvx command is broken (rare edge case)
+    # Note: uvx is part of uv package, so this only happens with broken installations
     if command -v uv >/dev/null 2>&1; then
         local uv_version
         if uv_version=$(uv --version 2>/dev/null); then
             log "Found existing uv installation: $uv_version"
-            log "Using existing uv ecosystem instead of isolated installation (better environment compatibility)"
+            log "WARNING: uv is installed but uvx command is not working - this is unusual"
+            log "Using uv run fallback (uvx is normally part of uv package)"
 
             # Set UVX_PATH to use the system uv with explicit tool execution
             UVX_PATH="$(command -v uv)"
@@ -233,9 +235,9 @@ detect_or_install_uvx() {
         fi
     fi
 
-    # Phase 3: No working uvx/uv found, install in isolated environment as last resort
-    log "No compatible uvx/uv found, installing in isolated environment..."
-    log "Note: Isolated installations may have environment compatibility issues"
+    # Phase 3: Neither uvx nor uv found - install uv (which includes uvx)
+    log "Neither uvx nor uv found - installing uv (uv package includes uvx command)"
+    log "Installing in isolated environment for maximum compatibility"
 
     # Create isolated installation directory
     local isolated_dir="/tmp/mcp-bootstrap-$$"
