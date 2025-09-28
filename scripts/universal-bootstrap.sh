@@ -5,7 +5,7 @@
 
 set -eu
 
-SCRIPT_VERSION="1.3.22"
+SCRIPT_VERSION="1.3.25"
 BASE_URL="${MCP_BOOTSTRAP_BASE_URL:-https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts}"
 CACHE_DIR="${MCP_BOOTSTRAP_CACHE_DIR:-${HOME}/.mcp/bootstrap-cache}"
 LOG_FILE="${HOME}/.mcp/bootstrap.log"
@@ -431,8 +431,6 @@ main() {
             case "$package_spec" in
                 git+*)
                     local repo_name=$(echo "$package_spec" | sed -E 's|git\+https?://[^/]+/[^/]+/([^/]+)\.git.*|\1|')
-                    echo "DEBUG: package_spec=$package_spec" >&2
-                    echo "DEBUG: repo_name='$repo_name'" >&2
                     case "$repo_name" in
                         *-[a-z][a-z][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9])
                             executable_name=$(echo "$repo_name" | sed -E 's/-[a-z][a-z][0-9]{8}$//')
@@ -461,13 +459,9 @@ main() {
                     # uvx works - exec directly with original arguments
                     # This creates identical process chain to direct uvx: Claude Desktop → uvx → FastMCP
 
-                    echo "DEBUG: use_from_syntax=$use_from_syntax" >&2
-                    echo "DEBUG: executable_name='$executable_name'" >&2
                     if [ "$use_from_syntax" = "true" ] && [ -n "$executable_name" ]; then
-                        echo "CALLING: $uvx_path --from $package_spec $executable_name $*" >&2
                         exec "$uvx_path" --from "$package_spec" "$executable_name" "$@"
                     else
-                        echo "CALLING: $uvx_path $package_spec $*" >&2
                         exec "$uvx_path" "$package_spec" "$@"
                     fi
                 fi
