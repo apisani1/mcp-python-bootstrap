@@ -5,7 +5,7 @@
 
 set -eu
 
-SCRIPT_VERSION="1.3.19"
+SCRIPT_VERSION="1.3.20"
 BASE_URL="${MCP_BOOTSTRAP_BASE_URL:-https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts}"
 CACHE_DIR="${MCP_BOOTSTRAP_CACHE_DIR:-${HOME}/.mcp/bootstrap-cache}"
 LOG_FILE="${HOME}/.mcp/bootstrap.log"
@@ -459,6 +459,8 @@ main() {
                     # uvx works - exec directly with original arguments
                     # This creates identical process chain to direct uvx: Claude Desktop → uvx → FastMCP
 
+                    echo "DEBUG: use_from_syntax=$use_from_syntax" >&2
+                    echo "DEBUG: executable_name='$executable_name'" >&2
                     if [ "$use_from_syntax" = "true" ] && [ -n "$executable_name" ]; then
                         echo "CALLING: $uvx_path --from $package_spec $executable_name $*" >&2
                         exec "$uvx_path" --from "$package_spec" "$executable_name" "$@"
