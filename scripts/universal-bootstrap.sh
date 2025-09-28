@@ -5,7 +5,7 @@
 
 set -eu
 
-SCRIPT_VERSION="1.3.18"
+SCRIPT_VERSION="1.3.19"
 BASE_URL="${MCP_BOOTSTRAP_BASE_URL:-https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts}"
 CACHE_DIR="${MCP_BOOTSTRAP_CACHE_DIR:-${HOME}/.mcp/bootstrap-cache}"
 LOG_FILE="${HOME}/.mcp/bootstrap.log"
@@ -460,13 +460,10 @@ main() {
                     # This creates identical process chain to direct uvx: Claude Desktop → uvx → FastMCP
 
                     if [ "$use_from_syntax" = "true" ] && [ -n "$executable_name" ]; then
-                        # Debug output for troubleshooting
-                        echo "DEBUG: uvx_path=$uvx_path" >&2
-                        echo "DEBUG: package_spec=$package_spec" >&2
-                        echo "DEBUG: executable_name=$executable_name" >&2
-                        echo "DEBUG: remaining_args=$*" >&2
+                        echo "CALLING: $uvx_path --from $package_spec $executable_name $*" >&2
                         exec "$uvx_path" --from "$package_spec" "$executable_name" "$@"
                     else
+                        echo "CALLING: $uvx_path $package_spec $*" >&2
                         exec "$uvx_path" "$package_spec" "$@"
                     fi
                 fi
