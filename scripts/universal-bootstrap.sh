@@ -1,11 +1,11 @@
 #!/bin/sh
 # Universal MCP Python Server Bootstrap
 # Detects platform and routes to appropriate implementation
-# Version: 1.3.16
+# Version: 1.3.17
 
 set -eu
 
-SCRIPT_VERSION="1.3.16"
+SCRIPT_VERSION="1.3.17"
 BASE_URL="${MCP_BOOTSTRAP_BASE_URL:-https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts}"
 CACHE_DIR="${MCP_BOOTSTRAP_CACHE_DIR:-${HOME}/.mcp/bootstrap-cache}"
 LOG_FILE="${HOME}/.mcp/bootstrap.log"
@@ -253,6 +253,12 @@ is_cache_fresh() {
             log "Cache missing smart bypass logic for transparent uvx execution - forcing refresh"
             return 1
         fi
+
+        # Check for universal script smart bypass (version 1.3.17)
+        if ! grep -q "Execute smart bypass if package spec is provided" "$cache_file" 2>/dev/null; then
+            log "Cache missing universal script smart bypass - forcing refresh"
+            return 1
+        fi
     fi
 
     if command -v stat >/dev/null 2>&1; then
@@ -403,6 +409,69 @@ main() {
     if [ $# -eq 0 ]; then
         show_help
         exit 1
+    fi
+
+    # SMART BYPASS: If uvx exists and works, exec directly to skip all bootstrap logic
+    # This makes the execution identical to direct uvx configuration
+    smart_bypass_to_uvx() {
+        local package_spec="${1:-}"
+        local executable_name=""
+        local use_from_syntax=false
+
+        # Parse arguments
+        if [ "${1:-}" = "--from" ] && [ $# -ge 3 ]; then
+            package_spec="$2"
+            executable_name="$3"
+            use_from_syntax=true
+            shift 3
+        else
+            package_spec="${1:-}"
+            shift 1
+            # Auto-detect executable name for git packages
+            case "$package_spec" in
+                git+*)
+                    local repo_name=$(echo "$package_spec" | sed -E 's|git\+https?://[^/]+/[^/]+/([^/]+)(\.git)?.*|\1|')
+                    case "$repo_name" in
+                        *-[a-z][a-z][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9])
+                            executable_name=$(echo "$repo_name" | sed -E 's/-[a-z][a-z][0-9]{8}$//')
+                            if [ "$executable_name" != "$repo_name" ]; then
+                                use_from_syntax=true
+                            fi
+                            ;;
+                        *)
+                            executable_name="$repo_name"
+                            ;;
+                    esac
+                    ;;
+            esac
+        fi
+
+        # Quick uvx detection without any logging or setup
+        local uvx_candidates="/usr/local/bin/uvx $HOME/.local/bin/uvx /opt/homebrew/bin/uvx"
+        if command -v uvx >/dev/null 2>&1; then
+            uvx_candidates="$(command -v uvx) $uvx_candidates"
+        fi
+
+        for uvx_path in $uvx_candidates; do
+            if [ -n "$uvx_path" ] && [ -x "$uvx_path" ]; then
+                # Test if uvx works (quick check)
+                if "$uvx_path" --version >/dev/null 2>&1; then
+                    # uvx works - exec directly with original arguments
+                    # This creates identical process chain to direct uvx: Claude Desktop → uvx → FastMCP
+
+                    if [ "$use_from_syntax" = "true" ] && [ -n "$executable_name" ]; then
+                        exec "$uvx_path" --from "$package_spec" "$executable_name" "$@"
+                    else
+                        exec "$uvx_path" "$package_spec" "$@"
+                    fi
+                fi
+            fi
+        done
+    }
+
+    # Execute smart bypass if package spec is provided
+    if [ -n "${1:-}" ]; then
+        smart_bypass_to_uvx "$@"
     fi
 
     log "MCP Python Server Bootstrap v$SCRIPT_VERSION starting"
