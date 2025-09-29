@@ -48,16 +48,37 @@ The `mcp_config.py` script automatically generates optimized MCP configurations:
 
 ### 🔧 Manual Configuration
 
-For advanced use cases, you can configure servers manually:
+For advanced use cases, you can configure servers manually with direct HTTP bootstrap:
 
 ```json
 {
   "mcpServers": {
     "filesystem": {
-      "command": "sh",
+      "command": "bash",
       "args": [
         "-c",
-        "curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-filesystem"
+        "TEMP_SCRIPT=$(mktemp) && curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh?$(date +%s) -o \"$TEMP_SCRIPT\" && sh \"$TEMP_SCRIPT\" mcp-server-filesystem && rm \"$TEMP_SCRIPT\""
+      ]
+    }
+  }
+}
+```
+
+This configuration:
+- Downloads the latest bootstrap script with cache-busting
+- Works on systems with or without uvx installed
+- Automatically installs uvx if needed
+- Cleans up temp files after execution
+
+**For GitHub repositories:**
+```json
+{
+  "mcpServers": {
+    "my-server": {
+      "command": "bash",
+      "args": [
+        "-c",
+        "TEMP_SCRIPT=$(mktemp) && curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh?$(date +%s) -o \"$TEMP_SCRIPT\" && sh \"$TEMP_SCRIPT\" git+https://github.com/user/my-mcp-server.git && rm \"$TEMP_SCRIPT\""
       ]
     }
   }
