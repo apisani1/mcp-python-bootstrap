@@ -5,7 +5,7 @@
 
 set -eu
 
-SCRIPT_VERSION="1.3.4"
+SCRIPT_VERSION="1.3.5"
 
 # Handle help and version first
 case "${1:-}" in
@@ -376,15 +376,17 @@ run_server() {
         # For git+ URLs, convert to GitHub archive URL to avoid git dependency
         archive_url=$(convert_git_to_archive_url_posix "$PACKAGE_SPEC")
 
-        if [ $? -eq 0 ] && [ "$archive_url" != "$PACKAGE_SPEC" ]; then
-            log "Using git-free installation via GitHub archive"
-            PACKAGE_SPEC="$archive_url"
-            package_type="github_archive"
-            # Force uv run syntax for archive URLs to avoid shebang issues
-            USING_UV_FALLBACK=true
-            log "Using uv run syntax for archive URL to avoid executable shebang issues"
+        # Check if git is available, offer user-friendly guidance
+        if ! command -v git >/dev/null 2>&1; then
+            log "Git+ URL detected: $PACKAGE_SPEC"
+            warn "Git is required for git+ URLs but not found on system"
+            printf "\n📋 INSTALLATION OPTIONS:\n" >&2
+            printf "1. Allow system to install git (recommended - enables direct repo access)\n" >&2
+            printf "2. Use PyPI package instead (if available): remove 'git+' and '.git' from package name\n" >&2
+            printf "\nThe system will now prompt to install git with user approval required.\n" >&2
+            printf "If you decline, consider using the PyPI package version instead.\n" >&2
         else
-            warn "Could not convert to archive URL, attempting original git+ URL (may require git)"
+            log "Git found at: $(command -v git) - proceeding with git+ URL"
         fi
 
         # Continue with uvx execution using the (possibly converted) package spec
@@ -407,7 +409,6 @@ export PYTHONUNBUFFERED=1
 # Debug logging
 echo "[Wrapper] Starting uvx with args: \$*" >&2
 echo "[Wrapper] UVX_BINARY: \$UVX_BINARY" >&2
-echo "[Wrapper] USING_UV_FALLBACK: ${USING_UV_FALLBACK:-false}" >&2
 
 # Test uvx availability
 if ! test -x "\$UVX_BINARY"; then
@@ -415,14 +416,8 @@ if ! test -x "\$UVX_BINARY"; then
     exit 127
 fi
 
-# For archive URLs, use 'uv run' to avoid shebang issues
-if [ "${USING_UV_FALLBACK:-false}" = "true" ]; then
-    echo "[Wrapper] Using uv run syntax for archive URL compatibility" >&2
-    exec "\$UVX_BINARY" run "\$@"
-else
-    # Execute uvx directly to preserve stdio for MCP communication
-    exec "\$UVX_BINARY" "\$@"
-fi
+# Execute uvx directly to preserve stdio for MCP communication
+exec "\$UVX_BINARY" "\$@"
 EOF
 
         chmod +x /tmp/mcp_wrapper_$$.sh
