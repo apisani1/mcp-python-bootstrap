@@ -5,7 +5,7 @@
 
 set -eu
 
-SCRIPT_VERSION="1.3.35"
+SCRIPT_VERSION="1.3.36"
 BASE_URL="${MCP_BOOTSTRAP_BASE_URL:-https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts}"
 CACHE_DIR="${MCP_BOOTSTRAP_CACHE_DIR:-${HOME}/.mcp/bootstrap-cache}"
 LOG_FILE="${HOME}/.mcp/bootstrap.log"
@@ -191,6 +191,12 @@ is_cache_fresh() {
         # Check for correct uvx --from syntax (version 1.3.25+)
         if grep -q "uvx.*run --from" "$cache_file" 2>/dev/null; then
             log "Cache contains incorrect 'uvx run --from' syntax - forcing refresh"
+            return 1
+        fi
+
+        # Check for smart PyPI fallback (version 1.3.26+)
+        if ! grep -q "Detected test repository with known PyPI package" "$cache_file" 2>/dev/null; then
+            log "Cache missing smart PyPI fallback for known repositories - forcing refresh"
             return 1
         fi
 
