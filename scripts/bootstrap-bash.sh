@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.23"
+SCRIPT_VERSION="1.3.24"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -637,19 +637,19 @@ run_server_direct() {
             error "curl is required to download GitHub raw URLs"
         fi
     elif [[ "$package_type" == "git" ]]; then
-        # Check if git is available, offer user-friendly guidance
-        if ! command -v git >/dev/null 2>&1; then
-            log "Git+ URL detected: $PACKAGE_SPEC"
-            warn "Git is required for git+ URLs but not found on system"
-            log ""
-            log "📋 INSTALLATION OPTIONS:"
-            log "1. Allow system to install git (recommended - enables direct repo access)"
-            log "2. Use PyPI package instead (if available): remove 'git+' and '.git' from package name"
-            log ""
-            log "The system will now prompt to install git with user approval required."
-            log "If you decline, consider using the PyPI package version instead."
+        # For git+ URLs, convert to GitHub archive URL to avoid git dependency
+        local archive_url
+        archive_url=$(convert_git_to_archive_url "$PACKAGE_SPEC")
+
+        if [[ $? -eq 0 && "$archive_url" != "$PACKAGE_SPEC" ]]; then
+            log "Using git-free installation via GitHub archive"
+            PACKAGE_SPEC="$archive_url"
+            package_type="github_archive"
+            # Force uv run syntax for archive URLs to avoid shebang issues
+            export USING_UV_FALLBACK=true
+            log "Using uv run syntax for archive URL to avoid executable shebang issues"
         else
-            log "Git found at: $(command -v git) - proceeding with git+ URL"
+            warn "Could not convert to archive URL, attempting original git+ URL (may require git)"
         fi
 
         # Continue with uvx execution using the (possibly converted) package spec
@@ -783,15 +783,39 @@ run_server_direct() {
             log "Process environment size: $(env | wc -l)"
 
             # Execute uvx directly without any wrapper to match working config exactly
-            if [[ "$USE_FROM_SYNTAX" == "true" ]]; then
+            if [[ "${USING_UV_FALLBACK:-false}" == "true" ]]; then
+                log "Final command: $UVX_PATH run --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
+                log "Process replacement: Using exec to replace current process with uv run (uv fallback)"
+                exec "$UVX_PATH" run --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"
+            else
                 log "Final command: $UVX_PATH --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
-                log "Process replacement: Using exec to replace current process with uvx --from syntax"
+                log "Process replacement: Using exec to replace current process with uvx (like direct config)"
                 exec "$UVX_PATH" --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"
+            fi
+        else
+            if [[ "${USING_UV_FALLBACK:-false}" == "true" ]]; then
+                log "Final command: $UVX_PATH run --from $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
+                log "Process replacement: Using exec to replace current process with uv run (uv fallback)"
+                exec "$UVX_PATH" run --from "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
             else
                 log "Final command: $UVX_PATH $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
-                log "Process replacement: Using exec to replace current process with uvx (standard syntax)"
+                log "Process replacement: Using exec to replace current process with uvx (like direct config)"
                 exec "$UVX_PATH" "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
             fi
+            log "Testing command execution..."
+            local uvx_error
+            if ! uvx_error=$("$UVX_PATH" --help 2>&1); then
+                warn "uvx command failed basic help test. Error: $uvx_error"
+                error "uvx environment incompatible - cannot execute basic commands"
+            fi
+            log "uvx help test passed successfully"
+
+            # Execute uvx directly without any wrapper to match working config exactly
+            log "Process replacement: Using exec to replace current process with uvx (like direct config)"
+
+            # Execute uvx directly with clean exec for MCP (exactly like working config)
+            exec "$UVX_PATH" "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
+        fi
     else
         # For PyPI/git packages, use uvx with detected/installed path
 
@@ -923,15 +947,39 @@ run_server_direct() {
             log "Process environment size: $(env | wc -l)"
 
             # Execute uvx directly without any wrapper to match working config exactly
-            if [[ "$USE_FROM_SYNTAX" == "true" ]]; then
+            if [[ "${USING_UV_FALLBACK:-false}" == "true" ]]; then
+                log "Final command: $UVX_PATH run --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
+                log "Process replacement: Using exec to replace current process with uv run (uv fallback)"
+                exec "$UVX_PATH" run --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"
+            else
                 log "Final command: $UVX_PATH --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
-                log "Process replacement: Using exec to replace current process with uvx --from syntax"
+                log "Process replacement: Using exec to replace current process with uvx (like direct config)"
                 exec "$UVX_PATH" --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"
+            fi
+        else
+            if [[ "${USING_UV_FALLBACK:-false}" == "true" ]]; then
+                log "Final command: $UVX_PATH run --from $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
+                log "Process replacement: Using exec to replace current process with uv run (uv fallback)"
+                exec "$UVX_PATH" run --from "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
             else
                 log "Final command: $UVX_PATH $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
-                log "Process replacement: Using exec to replace current process with uvx (standard syntax)"
+                log "Process replacement: Using exec to replace current process with uvx (like direct config)"
                 exec "$UVX_PATH" "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
             fi
+            log "Testing command execution..."
+            local uvx_error
+            if ! uvx_error=$("$UVX_PATH" --help 2>&1); then
+                warn "uvx command failed basic help test. Error: $uvx_error"
+                error "uvx environment incompatible - cannot execute basic commands"
+            fi
+            log "uvx help test passed successfully"
+
+            # Execute uvx directly without any wrapper to match working config exactly
+            log "Process replacement: Using exec to replace current process with uvx (like direct config)"
+
+            # Execute uvx directly with clean exec for MCP (exactly like working config)
+            exec "$UVX_PATH" "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
+        fi
     fi
 }
 
