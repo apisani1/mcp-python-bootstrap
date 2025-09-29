@@ -131,7 +131,7 @@ def create_or_update_config(
     package_spec: str,
     config_file: Path,
     server_args: Optional[List[str]] = None,
-    bootstrap_url: str = "https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/540d3de975dcfba61c47de0b9476ba84e1399054/scripts/universal-bootstrap.sh",
+    bootstrap_url: str = "https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh",
     executable_name: Optional[str] = None
 ) -> bool:
     """Create or update the MCP configuration file using bootstrap script."""
@@ -161,18 +161,20 @@ def create_or_update_config(
             else:
                 raw_url = package_spec
 
-            # Create remote bootstrap configuration
-            bootstrap_cmd = f"curl -sSL {bootstrap_url} | sh -s --"
+            # Create remote bootstrap configuration using temporary file pattern with cache-busting
             if server_args:
                 server_args_str = " " + " ".join(f"'{arg}'" for arg in server_args)
             else:
                 server_args_str = ""
 
+            # Use temporary file pattern with cache-busting to match working configuration
+            temp_file_cmd = f'TEMP_SCRIPT=$(mktemp) && curl -sSL {bootstrap_url}?$(date +%s) -o "$TEMP_SCRIPT" && sh "$TEMP_SCRIPT" \'{raw_url}\'{server_args_str} && rm "$TEMP_SCRIPT"'
+
             config_data["mcpServers"][server_name] = {
-                "command": "sh",
+                "command": "bash",
                 "args": [
                     "-c",
-                    f"{bootstrap_cmd} '{raw_url}'{server_args_str}"
+                    temp_file_cmd
                 ]
             }
         elif package_type == "local":
@@ -203,9 +205,7 @@ def create_or_update_config(
                 "args": args
             }
         else:
-            # For PyPI and git packages, use remote bootstrap with curl
-            bootstrap_cmd = f"curl -sSL {bootstrap_url} | sh -s --"
-
+            # For PyPI and git packages, use remote bootstrap with temporary file pattern
             # Detect if we need --from syntax for uvx
             if executable_name or (package_type in ["pypi", "git"] and executable_name != server_name):
                 # Auto-detect executable name if not provided
@@ -228,11 +228,14 @@ def create_or_update_config(
             else:
                 server_args_str = ""
 
+            # Use temporary file pattern with cache-busting to match working configuration
+            temp_file_cmd = f'TEMP_SCRIPT=$(mktemp) && curl -sSL {bootstrap_url}?$(date +%s) -o "$TEMP_SCRIPT" && sh "$TEMP_SCRIPT" {cmd_args}{server_args_str} && rm "$TEMP_SCRIPT"'
+
             config_data["mcpServers"][server_name] = {
-                "command": "sh",
+                "command": "bash",
                 "args": [
                     "-c",
-                    f"{bootstrap_cmd} {cmd_args}{server_args_str}"
+                    temp_file_cmd
                 ]
             }
 
@@ -242,7 +245,7 @@ def create_or_update_config(
                 "package_type": detect_package_type(package_spec),
                 "package_spec": package_spec,
                 "generated_by": "mcp_config.py",
-                "bootstrap_version": "1.2.0"
+                "bootstrap_version": "1.3.0"
             }
 
         # Write updated config using a temporary file for atomic operation
@@ -300,7 +303,7 @@ def parse_args():
     server_name = None
     config_file_name = None
     server_args = []
-    bootstrap_url = "https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/540d3de975dcfba61c47de0b9476ba84e1399054/scripts/universal-bootstrap.sh"
+    bootstrap_url = "https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh"
     executable_name = None
 
     i = 1
