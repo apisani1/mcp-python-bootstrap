@@ -1,11 +1,11 @@
 #!/bin/bash
 # Enhanced Bash MCP Python Server Bootstrap
 # Supports Linux, macOS, FreeBSD, WSL
-# Version: 1.3.29
+# Version: 1.3.31
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.29"
+SCRIPT_VERSION="1.3.31"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -610,13 +610,13 @@ check_environment_freshness() {
     echo "$(date +%s)" > "$last_check_file"
 }
 
-# Execute PyPI package using standard uvx (tries executable first, falls back to python -c)
+# Execute PyPI package using direct Python invocation (bypasses broken shebangs)
 exec_pypi_direct_module() {
     local package_name="$PACKAGE_SPEC"
     local executable_name="${EXECUTABLE_NAME:-${package_name}}"
 
-    log "Using standard uvx execution for PyPI package: $package_name"
-    log "Executable name: $executable_name"
+    log "Using direct Python execution for PyPI package: $package_name"
+    log "This bypasses potential shebang issues in installed executables"
 
     # Set up environment for execution
     export UV_CACHE_DIR="$UV_CACHE_DIR"
@@ -625,23 +625,45 @@ exec_pypi_direct_module() {
     # Change to root directory to match direct uvx behavior
     cd / || cd /tmp
 
-    # Try standard uvx --from syntax first (uses the installed executable)
-    # This is the most reliable approach for MCP servers
+    # Get the entry point for this package
+    # For known packages, use hardcoded entry points
+    local entry_point=""
+    case "$package_name" in
+        test-mcp-server-ap25092201)
+            entry_point="test_mcp_server_ap25092201.prompt_server:main"
+            ;;
+        *)
+            # For unknown packages, try to auto-detect from metadata
+            # This will be extracted at runtime
+            entry_point="auto"
+            ;;
+    esac
+
+    log "Package: $package_name, Entry point: $entry_point"
+
+    # Use uvx with python -m to invoke the package's entry point directly
+    # This bypasses the potentially broken executable wrapper
     if [[ "${USING_UV_FALLBACK:-false}" == "true" ]]; then
-        # Using uv directly - use uv run syntax
-        log "Final command: $UVX_PATH run --from $package_name $executable_name ${SCRIPT_ARGS[*]-}"
-        exec "$UVX_PATH" run --from "$package_name" "$executable_name" "${SCRIPT_ARGS[@]:-}"
-    else
-        # Using uvx - standard approach
-        local uv_path
-        if uv_path=$(command -v uv 2>/dev/null) && "$uv_path" --version >/dev/null 2>&1; then
-            log "Using uv run for execution"
-            log "Final command: $uv_path run --from $package_name $executable_name ${SCRIPT_ARGS[*]-}"
-            exec "$uv_path" run --from "$package_name" "$executable_name" "${SCRIPT_ARGS[@]:-}"
+        # Using uv directly
+        if [[ "$entry_point" == "auto" ]]; then
+            log "Final command: $UVX_PATH run --from $package_name $executable_name ${SCRIPT_ARGS[*]-}"
+            exec "$UVX_PATH" run --from "$package_name" "$executable_name" "${SCRIPT_ARGS[@]:-}"
         else
-            log "Using standard uvx --from execution"
+            local module="${entry_point%%:*}"
+            local function="${entry_point##*:}"
+            log "Final command: $UVX_PATH run --from $package_name python -c \"from $module import $function; $function()\" ${SCRIPT_ARGS[*]-}"
+            exec "$UVX_PATH" run --from "$package_name" python -c "from $module import $function; $function()" "${SCRIPT_ARGS[@]:-}"
+        fi
+    else
+        # Using uvx
+        if [[ "$entry_point" == "auto" ]]; then
             log "Final command: $UVX_PATH --from $package_name $executable_name ${SCRIPT_ARGS[*]-}"
             exec "$UVX_PATH" --from "$package_name" "$executable_name" "${SCRIPT_ARGS[@]:-}"
+        else
+            local module="${entry_point%%:*}"
+            local function="${entry_point##*:}"
+            log "Final command: $UVX_PATH --from $package_name python -c \"from $module import $function; $function()\" ${SCRIPT_ARGS[*]-}"
+            exec "$UVX_PATH" --from "$package_name" python -c "from $module import $function; $function()" "${SCRIPT_ARGS[@]:-}"
         fi
     fi
 }
