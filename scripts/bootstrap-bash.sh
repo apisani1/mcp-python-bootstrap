@@ -1,11 +1,11 @@
 #!/bin/bash
 # Enhanced Bash MCP Python Server Bootstrap
 # Supports Linux, macOS, FreeBSD, WSL
-# Version: 1.3.31
+# Version: 1.3.32
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.31"
+SCRIPT_VERSION="1.3.32"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -641,30 +641,34 @@ exec_pypi_direct_module() {
 
     log "Package: $package_name, Entry point: $entry_point"
 
-    # Use uvx with python -m to invoke the package's entry point directly
-    # This bypasses the potentially broken executable wrapper
-    if [[ "${USING_UV_FALLBACK:-false}" == "true" ]]; then
-        # Using uv directly
-        if [[ "$entry_point" == "auto" ]]; then
-            log "Final command: $UVX_PATH run --from $package_name $executable_name ${SCRIPT_ARGS[*]-}"
-            exec "$UVX_PATH" run --from "$package_name" "$executable_name" "${SCRIPT_ARGS[@]:-}"
-        else
-            local module="${entry_point%%:*}"
-            local function="${entry_point##*:}"
-            log "Final command: $UVX_PATH run --from $package_name python -c \"from $module import $function; $function()\" ${SCRIPT_ARGS[*]-}"
-            exec "$UVX_PATH" run --from "$package_name" python -c "from $module import $function; $function()" "${SCRIPT_ARGS[@]:-}"
-        fi
+    # For packages with known entry points, we have two strategies:
+    # 1. Try to use uvx to run the installed executable (may have shebang issues)
+    # 2. Use uv run with the executable name (more reliable)
+
+    # Check if we have access to 'uv' command for better stdin handling
+    local uv_path=""
+    if command -v uv >/dev/null 2>&1; then
+        uv_path=$(command -v uv)
+    elif [[ -x "$(dirname "$UVX_PATH")/uv" ]]; then
+        uv_path="$(dirname "$UVX_PATH")/uv"
+    fi
+
+    # Strategy: Use 'uv run' if available (better stdin handling), fallback to uvx with python -c
+    if [[ -n "$uv_path" ]] && [[ "$entry_point" != "auto" ]]; then
+        # Use uv run with the executable name - this has better stdin handling
+        log "Using uv run for better stdin compatibility"
+        log "Final command: $uv_path run --with $package_name $executable_name ${SCRIPT_ARGS[*]-}"
+        exec "$uv_path" run --with "$package_name" "$executable_name" "${SCRIPT_ARGS[@]:-}"
+    elif [[ "$entry_point" == "auto" ]]; then
+        # Unknown package - use standard uvx
+        log "Final command: $UVX_PATH --from $package_name $executable_name ${SCRIPT_ARGS[*]-}"
+        exec "$UVX_PATH" --from "$package_name" "$executable_name" "${SCRIPT_ARGS[@]:-}"
     else
-        # Using uvx
-        if [[ "$entry_point" == "auto" ]]; then
-            log "Final command: $UVX_PATH --from $package_name $executable_name ${SCRIPT_ARGS[*]-}"
-            exec "$UVX_PATH" --from "$package_name" "$executable_name" "${SCRIPT_ARGS[@]:-}"
-        else
-            local module="${entry_point%%:*}"
-            local function="${entry_point##*:}"
-            log "Final command: $UVX_PATH --from $package_name python -c \"from $module import $function; $function()\" ${SCRIPT_ARGS[*]-}"
-            exec "$UVX_PATH" --from "$package_name" python -c "from $module import $function; $function()" "${SCRIPT_ARGS[@]:-}"
-        fi
+        # Fallback: use python -c with unbuffered I/O
+        local module="${entry_point%%:*}"
+        local function="${entry_point##*:}"
+        log "Final command: $UVX_PATH --from $package_name python -u -c \"from $module import $function; $function()\" ${SCRIPT_ARGS[*]-}"
+        exec "$UVX_PATH" --from "$package_name" python -u -c "from $module import $function; $function()" "${SCRIPT_ARGS[@]:-}"
     fi
 }
 
