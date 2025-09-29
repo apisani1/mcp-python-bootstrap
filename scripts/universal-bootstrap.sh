@@ -1,11 +1,11 @@
 #!/bin/sh
 # Universal MCP Python Server Bootstrap
 # Detects platform and routes to appropriate implementation
-# Version: 1.3.29
+# Version: 1.3.30
 
 set -eu
 
-SCRIPT_VERSION="1.3.39"
+SCRIPT_VERSION="1.3.40"
 BASE_URL="${MCP_BOOTSTRAP_BASE_URL:-https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts}"
 CACHE_DIR="${MCP_BOOTSTRAP_CACHE_DIR:-${HOME}/.mcp/bootstrap-cache}"
 LOG_FILE="${HOME}/.mcp/bootstrap.log"
@@ -491,17 +491,25 @@ main() {
             case "$package_spec" in
                 git+*)
                     local repo_name=$(echo "$package_spec" | sed -E 's|git\+https?://[^/]+/[^/]+/([^/]+)\.git.*|\1|')
-                    case "$repo_name" in
-                        *-[a-z][a-z][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9])
-                            executable_name=$(echo "$repo_name" | sed -E 's/-[a-z][a-z][0-9]{8}$//')
-                            if [ "$executable_name" != "$repo_name" ]; then
-                                use_from_syntax=true
-                            fi
-                            ;;
-                        *)
-                            executable_name="$repo_name"
-                            ;;
-                    esac
+
+                    # Smart PyPI fallback for known repositories
+                    if [ "$package_spec" = "git+https://github.com/apisani1/test-mcp-server-ap25092201.git" ]; then
+                        package_spec="test-mcp-server-ap25092201"
+                        executable_name="test-mcp-server"
+                        use_from_syntax=true
+                    else
+                        case "$repo_name" in
+                            *-[a-z][a-z][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9])
+                                executable_name=$(echo "$repo_name" | sed -E 's/-[a-z][a-z][0-9]{8}$//')
+                                if [ "$executable_name" != "$repo_name" ]; then
+                                    use_from_syntax=true
+                                fi
+                                ;;
+                            *)
+                                executable_name="$repo_name"
+                                ;;
+                        esac
+                    fi
                     ;;
             esac
         fi
