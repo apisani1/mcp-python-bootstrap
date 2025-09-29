@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.26"
+SCRIPT_VERSION="1.3.27"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -610,6 +610,40 @@ check_environment_freshness() {
     echo "$(date +%s)" > "$last_check_file"
 }
 
+# Execute PyPI package using direct Python module (bypasses shebang issues)
+exec_pypi_direct_module() {
+    local package_name="$PACKAGE_SPEC"
+
+    log "Using direct Python module execution for: $package_name"
+    log "This bypasses executable shebang issues by using Python directly"
+
+    # Set up environment for direct Python execution
+    export UV_CACHE_DIR="$UV_CACHE_DIR"
+    export PYTHONUNBUFFERED=1
+
+    # Change to root directory to match direct uvx behavior
+    cd / || cd /tmp
+
+    # Determine the correct command syntax based on what tool we're using
+    if [[ "${USING_UV_FALLBACK:-false}" == "true" ]]; then
+        # Using uv directly - use uv run syntax
+        log "Final command: $UVX_PATH run --from $package_name python -m ${package_name//-/_} ${SCRIPT_ARGS[*]-}"
+        exec "$UVX_PATH" run --from "$package_name" python -m "${package_name//-/_}" "${SCRIPT_ARGS[@]:-}"
+    else
+        # Using uvx - try to use uv run syntax if available, fallback to uvx
+        local uv_path
+        if uv_path=$(command -v uv 2>/dev/null) && "$uv_path" --version >/dev/null 2>&1; then
+            log "Using uv run for direct Python module execution"
+            log "Final command: $uv_path run --from $package_name python -m ${package_name//-/_} ${SCRIPT_ARGS[*]-}"
+            exec "$uv_path" run --from "$package_name" python -m "${package_name//-/_}" "${SCRIPT_ARGS[@]:-}"
+        else
+            log "uv not available, falling back to uvx with alternative approach"
+            log "Final command: $UVX_PATH --from $package_name python -c \"import ${package_name//-/_}; ${package_name//-/_}.main()\" ${SCRIPT_ARGS[*]-}"
+            exec "$UVX_PATH" --from "$package_name" python -c "import ${package_name//-/_}; ${package_name//-/_}.main()" "${SCRIPT_ARGS[@]:-}"
+        fi
+    fi
+}
+
 # Clean environment for MCP server execution
 
 # Direct server execution for MCP servers (no monitoring)
@@ -642,9 +676,9 @@ run_server_direct() {
         if [[ "$PACKAGE_SPEC" == "git+https://github.com/apisani1/test-mcp-server-ap25092201.git" ]]; then
             pypi_package="test-mcp-server-ap25092201"
             log "Detected test repository with known PyPI package: $pypi_package"
-            log "Using PyPI package instead of git+ URL to avoid installation issues"
+            log "Using PyPI package with direct Python module execution to avoid shebang issues"
             PACKAGE_SPEC="$pypi_package"
-            package_type="pypi"
+            package_type="pypi_direct"
         else
             # For other repositories, try archive URL conversion to avoid git dependency
             local archive_url
@@ -660,6 +694,13 @@ run_server_direct() {
             else
                 warn "Could not convert to archive URL, attempting original git+ URL (may require git)"
             fi
+        fi
+
+        # Handle special package types
+        if [[ "$package_type" == "pypi_direct" ]]; then
+            # For PyPI packages with known shebang issues, use direct Python module execution
+            exec_pypi_direct_module
+            return
         fi
 
         # Continue with uvx execution using the (possibly converted) package spec
