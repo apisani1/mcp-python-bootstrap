@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.19"
+SCRIPT_VERSION="1.3.20"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -97,23 +97,31 @@ NC='\033[0m'
 # Logging functions
 log() {
     echo -e "${BLUE}[MCP-Python]${NC} $1" >&2
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - [INFO] $1" >> "$LOG_FILE"
+    # Ensure log directory exists before writing
+    mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - [INFO] $1" >> "$LOG_FILE" 2>/dev/null || true
 }
 
 warn() {
     echo -e "${YELLOW}[MCP-Python WARN]${NC} $1" >&2
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - [WARN] $1" >> "$LOG_FILE"
+    # Ensure log directory exists before writing
+    mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - [WARN] $1" >> "$LOG_FILE" 2>/dev/null || true
 }
 
 error() {
     echo -e "${RED}[MCP-Python ERROR]${NC} $1" >&2
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - [ERROR] $1" >> "$LOG_FILE"
+    # Ensure log directory exists before writing
+    mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - [ERROR] $1" >> "$LOG_FILE" 2>/dev/null || true
     exit 1
 }
 
 success() {
     echo -e "${GREEN}[MCP-Python]${NC} $1" >&2
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - [SUCCESS] $1" >> "$LOG_FILE"
+    # Ensure log directory exists before writing
+    mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - [SUCCESS] $1" >> "$LOG_FILE" 2>/dev/null || true
 }
 
 # Initialize directories and logging

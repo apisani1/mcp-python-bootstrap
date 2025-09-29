@@ -5,7 +5,7 @@
 
 set -eu
 
-SCRIPT_VERSION="1.3.29"
+SCRIPT_VERSION="1.3.30"
 BASE_URL="${MCP_BOOTSTRAP_BASE_URL:-https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts}"
 CACHE_DIR="${MCP_BOOTSTRAP_CACHE_DIR:-${HOME}/.mcp/bootstrap-cache}"
 LOG_FILE="${HOME}/.mcp/bootstrap.log"
@@ -167,6 +167,12 @@ is_cache_fresh() {
         # Check for comprehensive wrapper logging (latest version)
         if ! grep -q "mcp_wrapper.log" "$cache_file" 2>/dev/null; then
             log "Cache missing comprehensive wrapper logging - forcing refresh"
+            return 1
+        fi
+
+        # Check for logging directory creation fix (version 1.3.20+)
+        if ! grep -q "mkdir -p.*dirname.*LOG_FILE" "$cache_file" 2>/dev/null; then
+            log "Cache missing critical logging directory creation fix - forcing refresh"
             return 1
         fi
 

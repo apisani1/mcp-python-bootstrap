@@ -5,7 +5,7 @@
 
 set -eu
 
-SCRIPT_VERSION="1.3.1"
+SCRIPT_VERSION="1.3.2"
 
 # Handle help and version first
 case "${1:-}" in
@@ -117,22 +117,30 @@ LOG_FILE="$BOOTSTRAP_DIR/bootstrap.log"
 # Logging functions (POSIX-compliant)
 log() {
     printf "[MCP-Python] %s\n" "$1" >&2
+    # Ensure log directory exists before writing
+    mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
     printf "%s - [INFO] %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >> "$LOG_FILE" 2>/dev/null || true
 }
 
 warn() {
     printf "[MCP-Python WARN] %s\n" "$1" >&2
+    # Ensure log directory exists before writing
+    mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
     printf "%s - [WARN] %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >> "$LOG_FILE" 2>/dev/null || true
 }
 
 error() {
     printf "[MCP-Python ERROR] %s\n" "$1" >&2
+    # Ensure log directory exists before writing
+    mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
     printf "%s - [ERROR] %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >> "$LOG_FILE" 2>/dev/null || true
     exit 1
 }
 
 success() {
     printf "[MCP-Python] %s\n" "$1" >&2
+    # Ensure log directory exists before writing
+    mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
     printf "%s - [SUCCESS] %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >> "$LOG_FILE" 2>/dev/null || true
 }
 
