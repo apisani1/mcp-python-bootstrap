@@ -5,7 +5,7 @@
 
 set -eu
 
-SCRIPT_VERSION="1.3.31"
+SCRIPT_VERSION="1.3.32"
 BASE_URL="${MCP_BOOTSTRAP_BASE_URL:-https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts}"
 CACHE_DIR="${MCP_BOOTSTRAP_CACHE_DIR:-${HOME}/.mcp/bootstrap-cache}"
 LOG_FILE="${HOME}/.mcp/bootstrap.log"
@@ -179,6 +179,12 @@ is_cache_fresh() {
         # Check for git-free GitHub archive conversion (version 1.3.21+)
         if ! grep -q "convert_git_to_archive_url" "$cache_file" 2>/dev/null; then
             log "Cache missing git-free GitHub archive conversion - forcing refresh"
+            return 1
+        fi
+
+        # Check for archive URL shebang fix (version 1.3.22+)
+        if ! grep -q "Using uv run syntax for archive URL to avoid executable shebang issues" "$cache_file" 2>/dev/null; then
+            log "Cache missing archive URL shebang fix - forcing refresh"
             return 1
         fi
 

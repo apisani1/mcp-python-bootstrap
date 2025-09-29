@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.21"
+SCRIPT_VERSION="1.3.22"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -645,6 +645,9 @@ run_server_direct() {
             log "Using git-free installation via GitHub archive"
             PACKAGE_SPEC="$archive_url"
             package_type="github_archive"
+            # Force uv run syntax for archive URLs to avoid shebang issues
+            export USING_UV_FALLBACK=true
+            log "Using uv run syntax for archive URL to avoid executable shebang issues"
         else
             warn "Could not convert to archive URL, attempting original git+ URL (may require git)"
         fi
@@ -781,9 +784,9 @@ run_server_direct() {
 
             # Execute uvx directly without any wrapper to match working config exactly
             if [[ "${USING_UV_FALLBACK:-false}" == "true" ]]; then
-                log "Final command: $UVX_PATH run --with $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
+                log "Final command: $UVX_PATH run --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
                 log "Process replacement: Using exec to replace current process with uv run (uv fallback)"
-                exec "$UVX_PATH" run --with "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"
+                exec "$UVX_PATH" run --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"
             else
                 log "Final command: $UVX_PATH --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
                 log "Process replacement: Using exec to replace current process with uvx (like direct config)"
@@ -791,9 +794,9 @@ run_server_direct() {
             fi
         else
             if [[ "${USING_UV_FALLBACK:-false}" == "true" ]]; then
-                log "Final command: $UVX_PATH run --with $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
+                log "Final command: $UVX_PATH run --from $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
                 log "Process replacement: Using exec to replace current process with uv run (uv fallback)"
-                exec "$UVX_PATH" run --with "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
+                exec "$UVX_PATH" run --from "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
             else
                 log "Final command: $UVX_PATH $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
                 log "Process replacement: Using exec to replace current process with uvx (like direct config)"
@@ -945,9 +948,9 @@ run_server_direct() {
 
             # Execute uvx directly without any wrapper to match working config exactly
             if [[ "${USING_UV_FALLBACK:-false}" == "true" ]]; then
-                log "Final command: $UVX_PATH run --with $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
+                log "Final command: $UVX_PATH run --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
                 log "Process replacement: Using exec to replace current process with uv run (uv fallback)"
-                exec "$UVX_PATH" run --with "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"
+                exec "$UVX_PATH" run --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"
             else
                 log "Final command: $UVX_PATH --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
                 log "Process replacement: Using exec to replace current process with uvx (like direct config)"
@@ -955,9 +958,9 @@ run_server_direct() {
             fi
         else
             if [[ "${USING_UV_FALLBACK:-false}" == "true" ]]; then
-                log "Final command: $UVX_PATH run --with $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
+                log "Final command: $UVX_PATH run --from $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
                 log "Process replacement: Using exec to replace current process with uv run (uv fallback)"
-                exec "$UVX_PATH" run --with "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
+                exec "$UVX_PATH" run --from "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
             else
                 log "Final command: $UVX_PATH $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
                 log "Process replacement: Using exec to replace current process with uvx (like direct config)"
