@@ -1,11 +1,11 @@
 #!/bin/bash
 # Enhanced Bash MCP Python Server Bootstrap
 # Supports Linux, macOS, FreeBSD, WSL
-# Version: 1.3.28
+# Version: 1.3.29
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.28"
+SCRIPT_VERSION="1.3.29"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -610,52 +610,38 @@ check_environment_freshness() {
     echo "$(date +%s)" > "$last_check_file"
 }
 
-# Execute PyPI package using direct Python module (bypasses shebang issues)
+# Execute PyPI package using standard uvx (tries executable first, falls back to python -c)
 exec_pypi_direct_module() {
     local package_name="$PACKAGE_SPEC"
+    local executable_name="${EXECUTABLE_NAME:-${package_name}}"
 
-    log "Using direct Python module execution for: $package_name"
-    log "This bypasses executable shebang issues by using Python directly"
+    log "Using standard uvx execution for PyPI package: $package_name"
+    log "Executable name: $executable_name"
 
-    # Set up environment for direct Python execution
+    # Set up environment for execution
     export UV_CACHE_DIR="$UV_CACHE_DIR"
     export PYTHONUNBUFFERED=1
 
     # Change to root directory to match direct uvx behavior
     cd / || cd /tmp
 
-    # Get the correct entry point from the package
-    # For known packages, use hardcoded entry points (most reliable)
-    local entry_point_import=""
-    case "$package_name" in
-        test-mcp-server-ap25092201)
-            entry_point_import="from test_mcp_server_ap25092201.prompt_server import main; main()"
-            ;;
-        *)
-            # Generic fallback: try to detect entry point dynamically
-            # This uses the package metadata to find the console_scripts entry point
-            local module_name="${package_name//-/_}"
-            entry_point_import="import importlib.metadata; eps = [ep for ep in importlib.metadata.entry_points(group='console_scripts') if ep.name == '${package_name}']; exec('from ' + eps[0].value.split(':')[0] + ' import ' + eps[0].value.split(':')[1] + '; ' + eps[0].value.split(':')[1] + '()') if eps else exec('from ${module_name} import main; main()')"
-            ;;
-    esac
-
-    log "Using entry point: $entry_point_import"
-
+    # Try standard uvx --from syntax first (uses the installed executable)
+    # This is the most reliable approach for MCP servers
     if [[ "${USING_UV_FALLBACK:-false}" == "true" ]]; then
         # Using uv directly - use uv run syntax
-        log "Final command: $UVX_PATH run --from $package_name python -c \"$entry_point_import\" ${SCRIPT_ARGS[*]-}"
-        exec "$UVX_PATH" run --from "$package_name" python -c "$entry_point_import" "${SCRIPT_ARGS[@]:-}"
+        log "Final command: $UVX_PATH run --from $package_name $executable_name ${SCRIPT_ARGS[*]-}"
+        exec "$UVX_PATH" run --from "$package_name" "$executable_name" "${SCRIPT_ARGS[@]:-}"
     else
-        # Using uvx - try to use uv run syntax if available, fallback to uvx
+        # Using uvx - standard approach
         local uv_path
         if uv_path=$(command -v uv 2>/dev/null) && "$uv_path" --version >/dev/null 2>&1; then
-            log "Using uv run for direct Python module execution"
-            log "Final command: $uv_path run --from $package_name python -c \"$entry_point_import\" ${SCRIPT_ARGS[*]-}"
-            exec "$uv_path" run --from "$package_name" python -c "$entry_point_import" "${SCRIPT_ARGS[@]:-}"
+            log "Using uv run for execution"
+            log "Final command: $uv_path run --from $package_name $executable_name ${SCRIPT_ARGS[*]-}"
+            exec "$uv_path" run --from "$package_name" "$executable_name" "${SCRIPT_ARGS[@]:-}"
         else
-            log "uv not available, using uvx with entry point execution"
-            log "Final command: $UVX_PATH --from $package_name python -c \"$entry_point_import\" ${SCRIPT_ARGS[*]-}"
-            exec "$UVX_PATH" --from "$package_name" python -c "$entry_point_import" "${SCRIPT_ARGS[@]:-}"
+            log "Using standard uvx --from execution"
+            log "Final command: $UVX_PATH --from $package_name $executable_name ${SCRIPT_ARGS[*]-}"
+            exec "$UVX_PATH" --from "$package_name" "$executable_name" "${SCRIPT_ARGS[@]:-}"
         fi
     fi
 }
@@ -692,8 +678,9 @@ run_server_direct() {
         if [[ "$PACKAGE_SPEC" == "git+https://github.com/apisani1/test-mcp-server-ap25092201.git" ]]; then
             pypi_package="test-mcp-server-ap25092201"
             log "Detected test repository with known PyPI package: $pypi_package"
-            log "Using PyPI package with direct Python module execution to avoid shebang issues"
+            log "Using PyPI package with standard uvx execution (most reliable for MCP servers)"
             PACKAGE_SPEC="$pypi_package"
+            # Keep the executable name that was auto-detected earlier (test-mcp-server)
             package_type="pypi_direct"
         else
             # For other repositories, try archive URL conversion to avoid git dependency

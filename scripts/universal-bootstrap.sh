@@ -1,11 +1,11 @@
 #!/bin/sh
 # Universal MCP Python Server Bootstrap
 # Detects platform and routes to appropriate implementation
-# Version: 1.3.28
+# Version: 1.3.29
 
 set -eu
 
-SCRIPT_VERSION="1.3.38"
+SCRIPT_VERSION="1.3.39"
 BASE_URL="${MCP_BOOTSTRAP_BASE_URL:-https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts}"
 CACHE_DIR="${MCP_BOOTSTRAP_CACHE_DIR:-${HOME}/.mcp/bootstrap-cache}"
 LOG_FILE="${HOME}/.mcp/bootstrap.log"
@@ -309,8 +309,14 @@ is_cache_fresh() {
         fi
 
         # Check for entry point import logic (version 1.3.28+)
-        if ! grep -q "from test_mcp_server_ap25092201.prompt_server import main" "$cache_file" 2>/dev/null; then
-            log "Cache missing correct entry point execution logic - forcing refresh"
+        if grep -q "from test_mcp_server_ap25092201.prompt_server import main" "$cache_file" 2>/dev/null; then
+            log "Cache has python -c entry point approach - forcing refresh for standard uvx execution"
+            return 1
+        fi
+
+        # Check for standard uvx execution for PyPI packages (version 1.3.29+)
+        if ! grep -q "Using standard uvx execution for PyPI package" "$cache_file" 2>/dev/null; then
+            log "Cache missing standard uvx execution for PyPI packages - forcing refresh"
             return 1
         fi
     fi
