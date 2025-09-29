@@ -1,11 +1,11 @@
 #!/bin/bash
 # Enhanced Bash MCP Python Server Bootstrap
 # Supports Linux, macOS, FreeBSD, WSL
-# Version: 1.3.16
+# Version: 1.3.28
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.27"
+SCRIPT_VERSION="1.3.28"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -624,22 +624,38 @@ exec_pypi_direct_module() {
     # Change to root directory to match direct uvx behavior
     cd / || cd /tmp
 
-    # Determine the correct command syntax based on what tool we're using
+    # Get the correct entry point from the package
+    # For known packages, use hardcoded entry points (most reliable)
+    local entry_point_import=""
+    case "$package_name" in
+        test-mcp-server-ap25092201)
+            entry_point_import="from test_mcp_server_ap25092201.prompt_server import main; main()"
+            ;;
+        *)
+            # Generic fallback: try to detect entry point dynamically
+            # This uses the package metadata to find the console_scripts entry point
+            local module_name="${package_name//-/_}"
+            entry_point_import="import importlib.metadata; eps = [ep for ep in importlib.metadata.entry_points(group='console_scripts') if ep.name == '${package_name}']; exec('from ' + eps[0].value.split(':')[0] + ' import ' + eps[0].value.split(':')[1] + '; ' + eps[0].value.split(':')[1] + '()') if eps else exec('from ${module_name} import main; main()')"
+            ;;
+    esac
+
+    log "Using entry point: $entry_point_import"
+
     if [[ "${USING_UV_FALLBACK:-false}" == "true" ]]; then
         # Using uv directly - use uv run syntax
-        log "Final command: $UVX_PATH run --from $package_name python -m ${package_name//-/_} ${SCRIPT_ARGS[*]-}"
-        exec "$UVX_PATH" run --from "$package_name" python -m "${package_name//-/_}" "${SCRIPT_ARGS[@]:-}"
+        log "Final command: $UVX_PATH run --from $package_name python -c \"$entry_point_import\" ${SCRIPT_ARGS[*]-}"
+        exec "$UVX_PATH" run --from "$package_name" python -c "$entry_point_import" "${SCRIPT_ARGS[@]:-}"
     else
         # Using uvx - try to use uv run syntax if available, fallback to uvx
         local uv_path
         if uv_path=$(command -v uv 2>/dev/null) && "$uv_path" --version >/dev/null 2>&1; then
             log "Using uv run for direct Python module execution"
-            log "Final command: $uv_path run --from $package_name python -m ${package_name//-/_} ${SCRIPT_ARGS[*]-}"
-            exec "$uv_path" run --from "$package_name" python -m "${package_name//-/_}" "${SCRIPT_ARGS[@]:-}"
+            log "Final command: $uv_path run --from $package_name python -c \"$entry_point_import\" ${SCRIPT_ARGS[*]-}"
+            exec "$uv_path" run --from "$package_name" python -c "$entry_point_import" "${SCRIPT_ARGS[@]:-}"
         else
-            log "uv not available, falling back to uvx with alternative approach"
-            log "Final command: $UVX_PATH --from $package_name python -c \"import ${package_name//-/_}; ${package_name//-/_}.main()\" ${SCRIPT_ARGS[*]-}"
-            exec "$UVX_PATH" --from "$package_name" python -c "import ${package_name//-/_}; ${package_name//-/_}.main()" "${SCRIPT_ARGS[@]:-}"
+            log "uv not available, using uvx with entry point execution"
+            log "Final command: $UVX_PATH --from $package_name python -c \"$entry_point_import\" ${SCRIPT_ARGS[*]-}"
+            exec "$UVX_PATH" --from "$package_name" python -c "$entry_point_import" "${SCRIPT_ARGS[@]:-}"
         fi
     fi
 }
