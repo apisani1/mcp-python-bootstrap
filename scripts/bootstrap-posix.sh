@@ -5,7 +5,7 @@
 
 set -eu
 
-SCRIPT_VERSION="1.3.2"
+SCRIPT_VERSION="1.3.3"
 
 # Handle help and version first
 case "${1:-}" in
@@ -29,6 +29,40 @@ EOF
         exit 0
         ;;
 esac
+
+# Convert git+ URL to GitHub archive URL (avoids git dependency)
+convert_git_to_archive_url_posix() {
+    git_url="$1"
+
+    # Extract components from git+https://github.com/user/repo.git format
+    # Using POSIX-compliant sed expressions
+    if echo "$git_url" | grep -q "^git+https://github\.com/"; then
+        # Extract user/repo from the URL
+        user_repo=$(echo "$git_url" | sed -E 's|git\+https://github\.com/([^/]+/[^/]+)(\.git)?(#.*)?$|\1|')
+        user=$(echo "$user_repo" | cut -d'/' -f1)
+        repo=$(echo "$user_repo" | cut -d'/' -f2)
+
+        # Extract ref if present, default to main
+        ref="main"
+        if echo "$git_url" | grep -q "#"; then
+            ref=$(echo "$git_url" | sed -E 's|.*#(.+)$|\1|')
+        fi
+
+        # Remove .git suffix from repo name if present
+        repo=$(echo "$repo" | sed 's/\.git$//')
+
+        # Convert to GitHub archive URL
+        archive_url="https://github.com/$user/$repo/archive/$ref.zip"
+        printf "[MCP-Python] Converting git+ URL to archive URL (no git required): %s\n" "$archive_url" >&2
+        echo "$archive_url"
+        return 0
+    fi
+
+    # If conversion fails, return original
+    printf "[MCP-Python WARN] Could not convert git URL to archive format: %s\n" "$git_url" >&2
+    echo "$git_url"
+    return 1
+}
 
 # Auto-detect executable name for git packages (POSIX-compliant)
 detect_executable_name_posix() {
@@ -337,6 +371,58 @@ run_server() {
             fi
         else
             error "curl is required to download GitHub raw URLs"
+        fi
+    elif [ "$package_type" = "git" ]; then
+        # For git+ URLs, convert to GitHub archive URL to avoid git dependency
+        archive_url=$(convert_git_to_archive_url_posix "$PACKAGE_SPEC")
+
+        if [ $? -eq 0 ] && [ "$archive_url" != "$PACKAGE_SPEC" ]; then
+            log "Using git-free installation via GitHub archive"
+            PACKAGE_SPEC="$archive_url"
+            package_type="github_archive"
+        else
+            warn "Could not convert to archive URL, attempting original git+ URL (may require git)"
+        fi
+
+        # Continue with uvx execution using the (possibly converted) package spec
+        # For PyPI/git packages, use uvx with filtering wrapper
+        log "Creating isolated execution environment..."
+
+        # Create wrapper script for clean MCP execution
+        cat > /tmp/mcp_wrapper_$$.sh << EOF
+#!/bin/sh
+# POSIX wrapper for MCP server execution
+
+# Use detected/installed uvx path
+UVX_BINARY="$UVX_PATH"
+
+# Environment setup
+export UV_CACHE_DIR="${UV_CACHE_DIR:-}"
+export UV_NO_MODIFY_PATH=1
+export PYTHONUNBUFFERED=1
+
+# Debug logging
+echo "[Wrapper] Starting uvx with args: \$*" >&2
+echo "[Wrapper] UVX_BINARY: \$UVX_BINARY" >&2
+
+# Test uvx availability
+if ! test -x "\$UVX_BINARY"; then
+    echo "[Wrapper] ERROR: uvx not found at \$UVX_BINARY" >&2
+    exit 127
+fi
+
+# Execute uvx directly to preserve stdio for MCP communication
+exec "\$UVX_BINARY" "\$@"
+EOF
+
+        chmod +x /tmp/mcp_wrapper_$$.sh
+
+        if [ "$USE_FROM_SYNTAX" = "true" ]; then
+            log "Final command: /tmp/mcp_wrapper_$$.sh --from $PACKAGE_SPEC $EXECUTABLE_NAME $SCRIPT_ARGS"
+            exec /tmp/mcp_wrapper_$$.sh --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" $SCRIPT_ARGS
+        else
+            log "Final command: /tmp/mcp_wrapper_$$.sh $PACKAGE_SPEC $SCRIPT_ARGS"
+            exec /tmp/mcp_wrapper_$$.sh "$PACKAGE_SPEC" $SCRIPT_ARGS
         fi
     else
         # For PyPI/git packages, use uvx with filtering wrapper

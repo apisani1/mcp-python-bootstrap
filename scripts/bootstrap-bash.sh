@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.20"
+SCRIPT_VERSION="1.3.21"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -328,6 +328,32 @@ detect_or_install_uvx() {
     return 0
 }
 
+# Convert git+ URL to GitHub archive URL (avoids git dependency)
+convert_git_to_archive_url() {
+    local git_url="$1"
+
+    # Extract components from git+https://github.com/user/repo.git format
+    if [[ "$git_url" =~ git\+https://github\.com/([^/]+)/([^/]+)(\.git)?(#(.+))?$ ]]; then
+        local user="${BASH_REMATCH[1]}"
+        local repo="${BASH_REMATCH[2]}"
+        local ref="${BASH_REMATCH[5]:-main}"  # Default to main if no ref specified
+
+        # Remove .git suffix from repo name if present
+        repo="${repo%.git}"
+
+        # Convert to GitHub archive URL
+        local archive_url="https://github.com/$user/$repo/archive/$ref.zip"
+        log "Converting git+ URL to archive URL (no git required): $archive_url"
+        echo "$archive_url"
+        return 0
+    fi
+
+    # If conversion fails, return original
+    warn "Could not convert git URL to archive format: $git_url"
+    echo "$git_url"
+    return 1
+}
+
 # Detect package type
 detect_package_type() {
     local package_spec="$1"
@@ -609,6 +635,183 @@ run_server_direct() {
             fi
         else
             error "curl is required to download GitHub raw URLs"
+        fi
+    elif [[ "$package_type" == "git" ]]; then
+        # For git+ URLs, convert to GitHub archive URL to avoid git dependency
+        local archive_url
+        archive_url=$(convert_git_to_archive_url "$PACKAGE_SPEC")
+
+        if [[ $? -eq 0 && "$archive_url" != "$PACKAGE_SPEC" ]]; then
+            log "Using git-free installation via GitHub archive"
+            PACKAGE_SPEC="$archive_url"
+            package_type="github_archive"
+        else
+            warn "Could not convert to archive URL, attempting original git+ URL (may require git)"
+        fi
+
+        # Continue with uvx execution using the (possibly converted) package spec
+        # For PyPI/git packages, use uvx with detected/installed path
+
+        # Debug environment
+        log "=== MCP Server Execution Debug Info ==="
+        log "Working directory: $(pwd)"
+        log "UVX_PATH: $UVX_PATH"
+        log "UV_CACHE_DIR: ${UV_CACHE_DIR:-not set}"
+        log "User: $(whoami)"
+        log "Package: $PACKAGE_SPEC"
+        log "Arguments: ${SCRIPT_ARGS[*]-}"
+        log "Use from syntax: $USE_FROM_SYNTAX"
+
+        # Try direct execution first (like working Claude Desktop config)
+        log "Attempting direct uvx execution (matching working configuration)..."
+
+        # Debug: Test if uvx actually works in this environment
+        log "Testing uvx in current environment..."
+        if ! "$UVX_PATH" --version >/dev/null 2>&1; then
+            warn "uvx version check failed in current environment, falling back to isolated installation"
+            # Fall back to isolated installation directly without recursive call
+            log "Installing isolated uvx due to environment incompatibility..."
+
+            # Create isolated installation directory
+            local isolated_dir="/tmp/mcp-bootstrap-fallback-$$"
+            mkdir -p "$isolated_dir"
+
+            # Install uv in isolated mode
+            export UV_INSTALL_DIR="$isolated_dir"
+            export UV_CACHE_DIR="$isolated_dir/cache"
+            export UV_NO_MODIFY_PATH=1
+
+            if command_exists curl; then
+                curl -LsSf https://astral.sh/uv/install.sh | sh -s -- --no-modify-path >&2
+            else
+                error "curl required for isolated uvx installation"
+            fi
+
+            # Find the installed uvx
+            if [[ -x "$isolated_dir/uvx" ]]; then
+                UVX_PATH="$isolated_dir/uvx"
+            elif [[ -x "$isolated_dir/bin/uvx" ]]; then
+                UVX_PATH="$isolated_dir/bin/uvx"
+            else
+                error "Failed to install uvx in isolated environment"
+            fi
+
+            log "Isolated uvx installed at: $UVX_PATH"
+        fi
+
+        # Set comprehensive environment for uvx compatibility
+        export UV_CACHE_DIR="${UV_CACHE_DIR}"
+        export PYTHONUNBUFFERED=1
+        export PATH="$HOME/.local/bin:$PATH"  # Ensure uvx location is in PATH
+
+        # Critical macOS dynamic library environment variables (known uvx issue)
+        export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-}"
+        export DYLD_FALLBACK_LIBRARY_PATH="${DYLD_FALLBACK_LIBRARY_PATH:-/usr/local/lib:/opt/homebrew/lib:/usr/lib}"
+        export DYLD_FRAMEWORK_PATH="${DYLD_FRAMEWORK_PATH:-}"
+        export DYLD_FALLBACK_FRAMEWORK_PATH="${DYLD_FALLBACK_FRAMEWORK_PATH:-/usr/local/Frameworks:/opt/homebrew/Frameworks:/System/Library/Frameworks}"
+
+        # Linux equivalent library paths
+        export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}"
+
+        # Homebrew environment variables (critical for macOS)
+        export HOMEBREW_PREFIX="${HOMEBREW_PREFIX:-/opt/homebrew}"
+        export HOMEBREW_CELLAR="${HOMEBREW_CELLAR:-/opt/homebrew/Cellar}"
+        export HOMEBREW_REPOSITORY="${HOMEBREW_REPOSITORY:-/opt/homebrew}"
+
+        # Python and development environment
+        export LANG="${LANG:-en_US.UTF-8}"
+        export LC_ALL="${LC_ALL:-en_US.UTF-8}"
+        export TMPDIR="${TMPDIR:-/tmp}"
+
+        # Development tools environment
+        export PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-/opt/homebrew/lib/pkgconfig:/usr/local/lib/pkgconfig}"
+        export CMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH:-/opt/homebrew:/usr/local}"
+
+        # Shell and terminal environment
+        export TERM="${TERM:-xterm-256color}"
+        export SHELL="${SHELL:-/bin/bash}"
+
+        # Change to root directory to match direct uvx behavior (working config shows working directory: /)
+        cd / || cd /tmp
+
+        # Additional debugging: capture uvx stderr before exec
+        log "Environment test: PATH=$PATH"
+        log "Environment test: HOME=$HOME"
+        log "Environment test: USER=$USER"
+        log "Environment test: DYLD_FALLBACK_LIBRARY_PATH=$DYLD_FALLBACK_LIBRARY_PATH"
+        log "Environment test: HOMEBREW_PREFIX=$HOMEBREW_PREFIX"
+        log "Environment test: LANG=$LANG"
+        log "Environment test: TERM=$TERM"
+
+        if [[ "$USE_FROM_SYNTAX" == "true" ]]; then
+            log "Final command: $UVX_PATH --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
+
+            # Test command before exec to catch issues
+            log "Testing command execution..."
+            local uvx_error
+            if ! uvx_error=$("$UVX_PATH" --help 2>&1); then
+                warn "uvx command failed basic help test. Error: $uvx_error"
+                error "uvx environment incompatible - cannot execute basic commands"
+            fi
+            log "uvx help test passed successfully"
+
+            # Keep TERM environment as-is to match direct uvx behavior
+            log "Preserving TERM environment: $TERM (matching direct uvx behavior)"
+
+            # Debug: Comprehensive process relationship analysis
+            log "=== Process Relationship Debug Info ==="
+            log "Current PID: $$"
+            log "Parent PID: $PPID"
+            log "Process Group ID: $(ps -o pgid= -p $$)"
+            log "Session ID: $(ps -o sid= -p $$)"
+            log "Process Tree: $(ps -o pid,ppid,pgid,sid,comm | grep -E '($$|'$PPID'|bash|uvx|python)')"
+
+            # Debug: Stdin file descriptor analysis
+            log "=== Stdin Characteristics Analysis ==="
+            log "Stdin file descriptor: 0"
+            log "Stdin file type: $(file /proc/self/fd/0 2>/dev/null || echo 'unknown')"
+            log "Stdin stat info: $(stat /proc/self/fd/0 2>/dev/null || stat /dev/fd/0 2>/dev/null || echo 'stat unavailable')"
+            log "Shell stdin check: $(if [[ -t 0 ]]; then echo 'terminal'; else echo 'pipe/redirect'; fi)"
+
+            # Debug: Signal and session context
+            log "=== Signal and Session Context ==="
+            log "Signal mask: $(kill -l 2>/dev/null | head -5 || echo 'signal list unavailable')"
+            log "Controlling terminal: $(ps -o tty -p $$ | tail -1)"
+            log "Process environment size: $(env | wc -l)"
+
+            # Execute uvx directly without any wrapper to match working config exactly
+            if [[ "${USING_UV_FALLBACK:-false}" == "true" ]]; then
+                log "Final command: $UVX_PATH run --with $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
+                log "Process replacement: Using exec to replace current process with uv run (uv fallback)"
+                exec "$UVX_PATH" run --with "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"
+            else
+                log "Final command: $UVX_PATH --from $PACKAGE_SPEC $EXECUTABLE_NAME ${SCRIPT_ARGS[*]-}"
+                log "Process replacement: Using exec to replace current process with uvx (like direct config)"
+                exec "$UVX_PATH" --from "$PACKAGE_SPEC" "$EXECUTABLE_NAME" "${SCRIPT_ARGS[@]:-}"
+            fi
+        else
+            if [[ "${USING_UV_FALLBACK:-false}" == "true" ]]; then
+                log "Final command: $UVX_PATH run --with $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
+                log "Process replacement: Using exec to replace current process with uv run (uv fallback)"
+                exec "$UVX_PATH" run --with "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
+            else
+                log "Final command: $UVX_PATH $PACKAGE_SPEC ${SCRIPT_ARGS[*]-}"
+                log "Process replacement: Using exec to replace current process with uvx (like direct config)"
+                exec "$UVX_PATH" "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
+            fi
+            log "Testing command execution..."
+            local uvx_error
+            if ! uvx_error=$("$UVX_PATH" --help 2>&1); then
+                warn "uvx command failed basic help test. Error: $uvx_error"
+                error "uvx environment incompatible - cannot execute basic commands"
+            fi
+            log "uvx help test passed successfully"
+
+            # Execute uvx directly without any wrapper to match working config exactly
+            log "Process replacement: Using exec to replace current process with uvx (like direct config)"
+
+            # Execute uvx directly with clean exec for MCP (exactly like working config)
+            exec "$UVX_PATH" "$PACKAGE_SPEC" "${SCRIPT_ARGS[@]:-}"
         fi
     else
         # For PyPI/git packages, use uvx with detected/installed path
