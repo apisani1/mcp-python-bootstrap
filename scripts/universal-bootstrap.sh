@@ -1,11 +1,11 @@
 #!/bin/sh
 # Universal MCP Python Server Bootstrap
 # Detects platform and routes to appropriate implementation
-# Version: 1.3.31
+# Version: 1.3.32
 
 set -eu
 
-SCRIPT_VERSION="1.3.41"
+SCRIPT_VERSION="1.3.42"
 BASE_URL="${MCP_BOOTSTRAP_BASE_URL:-https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts}"
 CACHE_DIR="${MCP_BOOTSTRAP_CACHE_DIR:-${HOME}/.mcp/bootstrap-cache}"
 LOG_FILE="${HOME}/.mcp/bootstrap.log"
@@ -321,8 +321,14 @@ is_cache_fresh() {
         fi
 
         # Check for direct Python execution to bypass shebangs (version 1.3.31+)
-        if ! grep -q "Using direct Python execution for PyPI package" "$cache_file" 2>/dev/null; then
-            log "Cache missing direct Python execution for shebang bypass - forcing refresh"
+        if grep -q "Using direct Python execution for PyPI package" "$cache_file" 2>/dev/null && ! grep -q "Using uv run for better stdin compatibility" "$cache_file" 2>/dev/null; then
+            log "Cache missing uv run stdin compatibility fix - forcing refresh"
+            return 1
+        fi
+
+        # Check for uv run usage (version 1.3.32+)
+        if ! grep -q "uv run --with" "$cache_file" 2>/dev/null; then
+            log "Cache missing uv run --with command for stdin handling - forcing refresh"
             return 1
         fi
     fi
