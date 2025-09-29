@@ -5,7 +5,7 @@
 
 set -eu
 
-SCRIPT_VERSION="1.3.34"
+SCRIPT_VERSION="1.3.35"
 BASE_URL="${MCP_BOOTSTRAP_BASE_URL:-https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts}"
 CACHE_DIR="${MCP_BOOTSTRAP_CACHE_DIR:-${HOME}/.mcp/bootstrap-cache}"
 LOG_FILE="${HOME}/.mcp/bootstrap.log"
@@ -185,6 +185,12 @@ is_cache_fresh() {
         # Check for user-friendly git guidance (version 1.3.23+)
         if ! grep -q "INSTALLATION OPTIONS" "$cache_file" 2>/dev/null; then
             log "Cache missing user-friendly git installation guidance - forcing refresh"
+            return 1
+        fi
+
+        # Check for correct uvx --from syntax (version 1.3.25+)
+        if grep -q "uvx.*run --from" "$cache_file" 2>/dev/null; then
+            log "Cache contains incorrect 'uvx run --from' syntax - forcing refresh"
             return 1
         fi
 
