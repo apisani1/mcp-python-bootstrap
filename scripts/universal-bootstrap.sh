@@ -1,11 +1,11 @@
 #!/bin/sh
 # Universal MCP Python Server Bootstrap
 # Detects platform and routes to appropriate implementation
-# Version: 1.3.34
+# Version: 1.3.35
 
 set -eu
 
-SCRIPT_VERSION="1.3.44"
+SCRIPT_VERSION="1.3.45"
 BASE_URL="${MCP_BOOTSTRAP_BASE_URL:-https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts}"
 CACHE_DIR="${MCP_BOOTSTRAP_CACHE_DIR:-${HOME}/.mcp/bootstrap-cache}"
 LOG_FILE="${HOME}/.mcp/bootstrap.log"
@@ -373,15 +373,20 @@ download_script() {
     log "Downloading script: $script_name"
     local script_url="$BASE_URL/$script_name"
 
+    # Add cache-busting parameter to force GitHub CDN refresh
+    # Use script version as cache buster for predictable invalidation
+    local cache_buster="v=$SCRIPT_VERSION"
+    local download_url="$script_url?$cache_buster"
+
     if command -v curl >/dev/null 2>&1; then
-        if curl -sSfL "$script_url" -o "$cache_file.tmp"; then
+        if curl -sSfL "$download_url" -o "$cache_file.tmp"; then
             mv "$cache_file.tmp" "$cache_file"
             cat "$cache_file"
         else
             error "Failed to download $script_name from $script_url"
         fi
     elif command -v wget >/dev/null 2>&1; then
-        if wget -qO "$cache_file.tmp" "$script_url"; then
+        if wget -qO "$cache_file.tmp" "$download_url"; then
             mv "$cache_file.tmp" "$cache_file"
             cat "$cache_file"
         else
