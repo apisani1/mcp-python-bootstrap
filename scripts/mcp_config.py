@@ -23,12 +23,15 @@ def detect_package_type(package_spec: str) -> str:
     """Detect the type of package specification."""
     if package_spec.startswith("git+"):
         return "git"
-    elif package_spec.startswith(("https://github.com/", "http://github.com/", "https://gitlab.com/", "https://bitbucket.org/")):
+    if package_spec.startswith(
+        ("https://github.com/", "http://github.com/",
+         "https://gitlab.com/", "https://bitbucket.org/")
+    ):
         return "github_raw"
-    elif package_spec.startswith(("/", "./", "../")) or package_spec.startswith("-e"):
+    if (package_spec.startswith(("/", "./", "../"))
+            or package_spec.startswith("-e")):
         return "local"
-    else:
-        return "pypi"
+    return "pypi"
 
 
 def extract_server_name(package_spec: str, filepath: Optional[Path] = None) -> Optional[str]:
@@ -42,7 +45,7 @@ def extract_server_name(package_spec: str, filepath: Optional[Path] = None) -> O
             match = re.search(pattern, content)
             if match:
                 return match.group(1)
-        except Exception as e:
+        except (OSError, IOError, UnicodeDecodeError) as e:
             print(f"Warning: Could not read file {filepath}: {e}")
 
     # Fallback: derive from package spec
@@ -52,7 +55,7 @@ def extract_server_name(package_spec: str, filepath: Optional[Path] = None) -> O
         # Extract package name from PyPI spec (remove version constraints)
         name = re.split(r'[><=!~]', package_spec.split('[')[0])[0]
         return name.replace('-', '_').replace('_', '-')
-    elif package_type == "git":
+    if package_type == "git":
         # Extract from git URL
         match = re.search(r'/([^/]+?)(?:\.git)?(?:#.*)?$', package_spec)
         if match:
@@ -77,7 +80,7 @@ def detect_executable_name(package_spec: str) -> Optional[str]:
     """Detect the likely executable name from package specification."""
     package_type = detect_package_type(package_spec)
 
-    if package_type == "pypi" or package_type == "git":
+    if package_type in ("pypi", "git"):
         # For git packages, extract the actual package name from the URL first
         if package_type == "git":
             server_name = extract_server_name(package_spec)
@@ -135,7 +138,10 @@ def create_or_update_config(
     package_spec: str,
     config_file: Path,
     server_args: Optional[List[str]] = None,
-    bootstrap_url: str = "https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh",
+    bootstrap_url: str = (
+        "https://raw.githubusercontent.com/apisani1/"
+        "mcp-python-bootstrap/main/scripts/universal-bootstrap.sh"
+    ),
     executable_name: Optional[str] = None
 ) -> bool:
     """Create or update the MCP configuration file using bootstrap script."""
@@ -157,11 +163,14 @@ def create_or_update_config(
         package_type = detect_package_type(package_spec)
 
         if package_type == "github_raw":
-            # For GitHub raw URLs, convert to proper format and use remote bootstrap
-            # Convert GitHub blob URLs to raw URLs if needed
+            # For GitHub raw URLs, convert to proper format and use
+            # remote bootstrap. Convert GitHub blob URLs to raw URLs if needed
             if "/blob/" in package_spec:
-                # Convert github.com/user/repo/blob/branch/file to raw.githubusercontent.com/user/repo/branch/file
-                raw_url = package_spec.replace("github.com/", "raw.githubusercontent.com/").replace("/blob/", "/")
+                # Convert github.com/user/repo/blob/branch/file to
+                # raw.githubusercontent.com/user/repo/branch/file
+                raw_url = package_spec.replace(
+                    "github.com/", "raw.githubusercontent.com/"
+                ).replace("/blob/", "/")
             else:
                 raw_url = package_spec
 
@@ -171,8 +180,13 @@ def create_or_update_config(
             else:
                 server_args_str = ""
 
-            # Use temporary file pattern with cache-busting to match working configuration
-            temp_file_cmd = f'TEMP_SCRIPT=$(mktemp) && curl -sSL {bootstrap_url}?$(date +%s) -o "$TEMP_SCRIPT" && sh "$TEMP_SCRIPT" \'{raw_url}\'{server_args_str} && rm "$TEMP_SCRIPT"'
+            # Use temporary file pattern with cache-busting to match
+            # working configuration
+            temp_file_cmd = (
+                f'TEMP_SCRIPT=$(mktemp) && curl -sSL {bootstrap_url}?'
+                f'$(date +%s) -o "$TEMP_SCRIPT" && sh "$TEMP_SCRIPT" '
+                f"'{raw_url}'{server_args_str} && rm \"$TEMP_SCRIPT\""
+            )
 
             config_data["mcpServers"][server_name] = {
                 "command": "bash",
@@ -186,14 +200,22 @@ def create_or_update_config(
             bootstrap_script = get_bootstrap_script_path()
 
             # Detect if we need --from syntax for uvx
-            if executable_name or (package_type in ["pypi", "git"] and executable_name != server_name):
+            if (executable_name or
+                    (package_type in ["pypi", "git"]
+                     and executable_name != server_name)):
                 # Auto-detect executable name if not provided
                 if not executable_name:
                     executable_name = detect_executable_name(package_spec)
 
                 if executable_name and executable_name != server_name:
-                    # Use --from syntax: ["bootstrap.sh", "--from", "package", "executable"]
-                    args = [str(bootstrap_script), "--from", package_spec, executable_name]
+                    # Use --from syntax:
+                    # ["bootstrap.sh", "--from", "package", "executable"]
+                    args = [
+                        str(bootstrap_script),
+                        "--from",
+                        package_spec,
+                        executable_name
+                    ]
                 else:
                     # Regular syntax
                     args = [str(bootstrap_script), package_spec]
@@ -209,9 +231,11 @@ def create_or_update_config(
                 "args": args
             }
         else:
-            # For PyPI and git packages, use remote bootstrap with temporary file pattern
-            # Detect if we need --from syntax for uvx
-            if executable_name or (package_type in ["pypi", "git"] and executable_name != server_name):
+            # For PyPI and git packages, use remote bootstrap with
+            # temporary file pattern. Detect if we need --from syntax for uvx
+            if (executable_name or
+                    (package_type in ["pypi", "git"]
+                     and executable_name != server_name)):
                 # Auto-detect executable name if not provided
                 if not executable_name:
                     executable_name = detect_executable_name(package_spec)
@@ -232,8 +256,13 @@ def create_or_update_config(
             else:
                 server_args_str = ""
 
-            # Use temporary file pattern with cache-busting to match working configuration
-            temp_file_cmd = f'TEMP_SCRIPT=$(mktemp) && curl -sSL {bootstrap_url}?$(date +%s) -o "$TEMP_SCRIPT" && sh "$TEMP_SCRIPT" {cmd_args}{server_args_str} && rm "$TEMP_SCRIPT"'
+            # Use temporary file pattern with cache-busting to match
+            # working configuration
+            temp_file_cmd = (
+                f'TEMP_SCRIPT=$(mktemp) && curl -sSL {bootstrap_url}?'
+                f'$(date +%s) -o "$TEMP_SCRIPT" && sh "$TEMP_SCRIPT" '
+                f'{cmd_args}{server_args_str} && rm "$TEMP_SCRIPT"'
+            )
 
             config_data["mcpServers"][server_name] = {
                 "command": "bash",
@@ -244,7 +273,8 @@ def create_or_update_config(
             }
 
         # Add comment/metadata for better understanding
-        if server_name not in config_data["mcpServers"] or "_metadata" not in config_data["mcpServers"][server_name]:
+        if (server_name not in config_data["mcpServers"]
+                or "_metadata" not in config_data["mcpServers"][server_name]):
             config_data["mcpServers"][server_name]["_metadata"] = {
                 "package_type": detect_package_type(package_spec),
                 "package_spec": package_spec,
@@ -261,7 +291,7 @@ def create_or_update_config(
         tmp_path.replace(config_file)
 
         return True
-    except Exception as e:
+    except (OSError, IOError, json.JSONDecodeError, ValueError) as e:
         print(f"Error updating config file {config_file}: {e}")
         return False
 
@@ -292,8 +322,14 @@ def print_usage():
     print("  python3 mcp_config.py mcp-server-filesystem")
     print("  python3 mcp_config.py ./src/my_server.py --name my-server")
     print("  python3 mcp_config.py mcp-server-database==1.2.0 --args '--db-path,/tmp/db.sqlite'")
-    print("  python3 mcp_config.py test-mcp-server-ap25092201 --executable test-mcp-server")
-    print("  python3 mcp_config.py https://github.com/user/repo/blob/main/server.py --bootstrap-url https://example.com/bootstrap.sh")
+    print(
+        "  python3 mcp_config.py test-mcp-server-ap25092201 "
+        "--executable test-mcp-server"
+    )
+    print(
+        "  python3 mcp_config.py https://github.com/user/repo/blob/main/"
+        "server.py --bootstrap-url https://example.com/bootstrap.sh"
+    )
 
 
 def parse_args():
@@ -307,7 +343,10 @@ def parse_args():
     server_name = None
     config_file_name = None
     server_args = []
-    bootstrap_url = "https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh"
+    bootstrap_url = (
+        "https://raw.githubusercontent.com/apisani1/"
+        "mcp-python-bootstrap/main/scripts/universal-bootstrap.sh"
+    )
     executable_name = None
 
     i = 1
@@ -342,7 +381,8 @@ def parse_args():
 
 def main() -> None:
     """Main function to handle command line arguments and execute the script."""
-    package_spec, server_name, config_file_name, server_args, bootstrap_url, executable_name = parse_args()
+    (package_spec, server_name, config_file_name,
+     server_args, bootstrap_url, executable_name) = parse_args()
 
     # Auto-detect server name if not provided
     if not server_name:
@@ -369,7 +409,8 @@ def main() -> None:
             server_name = extract_server_name(package_spec)
 
         if not server_name:
-            print(f"Error: Could not determine server name. Use --name to specify it.")
+            print("Error: Could not determine server name. "
+                  "Use --name to specify it.")
             sys.exit(1)
 
     # Validate bootstrap script exists
@@ -380,9 +421,12 @@ def main() -> None:
 
     # Create or update config file
     config_file = Path(config_file_name)
-    if create_or_update_config(server_name, package_spec, config_file, server_args, bootstrap_url, executable_name):
+    if create_or_update_config(
+        server_name, package_spec, config_file,
+        server_args, bootstrap_url, executable_name
+    ):
         package_type = detect_package_type(package_spec)
-        print(f"✅ Added MCP server configuration:")
+        print("✅ Added MCP server configuration:")
         print(f"   Name: {server_name}")
         print(f"   Type: {package_type}")
         print(f"   Package: {package_spec}")
