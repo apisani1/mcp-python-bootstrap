@@ -1,11 +1,11 @@
 #!/bin/bash
 # Enhanced Bash MCP Python Server Bootstrap
 # Supports Linux, macOS, FreeBSD, WSL
-# Version: 1.3.33
+# Version: 1.3.34
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.33"
+SCRIPT_VERSION="1.3.34"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -699,9 +699,73 @@ run_server_direct() {
             error "curl is required to download GitHub raw URLs"
         fi
     elif [[ "$package_type" == "git" ]]; then
-        # For git packages, use them directly - better stdin handling than PyPI conversion
+        # For git packages, check if git is available
+        # uvx requires git to be installed for git+ URLs
+        if ! command -v git >/dev/null 2>&1; then
+            warn "git command not found - uvx requires git for git+ URLs"
+            warn "Attempting to detect and trigger git installation..."
+
+            # Detect OS and attempt to trigger git installation
+            local platform=$(uname -s)
+            case "$platform" in
+                Darwin)
+                    # macOS - trigger Xcode Command Line Tools installation
+                    warn "On macOS, git is part of Xcode Command Line Tools"
+                    warn "Triggering installation dialog..."
+
+                    # Trigger the installation by attempting to use git
+                    # This will show the installation dialog to the user
+                    git --version >/dev/null 2>&1 || true
+
+                    # Wait and check for git availability
+                    log "Waiting for git installation..."
+                    log "Please follow the installation dialog that should have appeared"
+                    log "This process may take several minutes"
+
+                    local max_wait=600  # 10 minutes maximum wait
+                    local wait_interval=5
+                    local elapsed=0
+
+                    while [[ $elapsed -lt $max_wait ]]; do
+                        if command -v git >/dev/null 2>&1; then
+                            success "git is now available!"
+                            local git_version=$(git --version 2>/dev/null || echo "unknown")
+                            log "Git version: $git_version"
+                            break
+                        fi
+
+                        log "Still waiting for git installation... ($elapsed/$max_wait seconds)"
+                        sleep $wait_interval
+                        elapsed=$((elapsed + wait_interval))
+                    done
+
+                    if ! command -v git >/dev/null 2>&1; then
+                        error "git installation timed out or was cancelled.
+
+To manually install git on macOS, run:
+    xcode-select --install
+
+Then retry the MCP server connection."
+                    fi
+                    ;;
+                Linux)
+                    error "git command not found. Please install git:
+
+Ubuntu/Debian:  sudo apt-get update && sudo apt-get install -y git
+CentOS/RHEL:    sudo yum install -y git
+Fedora:         sudo dnf install -y git
+Alpine:         apk add git
+
+Then retry the MCP server connection."
+                    ;;
+                *)
+                    error "git command not found. Please install git for your platform, then retry."
+                    ;;
+            esac
+        fi
+
         log "Using git+ URL directly for maximum compatibility"
-        # No conversion needed - git+ URLs work well with uvx
+        # No conversion needed - git+ URLs work well with uvx when git is available
 
         # Continue with uvx execution using the (possibly converted) package spec
         # For PyPI/git packages, use uvx with detected/installed path
