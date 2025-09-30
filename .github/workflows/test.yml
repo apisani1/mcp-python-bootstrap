@@ -104,12 +104,13 @@ jobs:
     - name: Test PowerShell error handling
       run: |
         # Test that PowerShell script handles errors correctly
-        $result = powershell -ExecutionPolicy Bypass -File scripts/bootstrap.ps1 -PackageSpec "" 2>&1
+        powershell -ExecutionPolicy Bypass -File scripts/bootstrap.ps1 -PackageSpec "" 2>&1 | Out-Null
         if ($LASTEXITCODE -eq 0) {
           Write-Error "Script should fail with empty package"
           exit 1
         }
         Write-Output "✅ PowerShell error handling works"
+        exit 0
 
   test-python-suite:
     runs-on: ${{ matrix.os }}
