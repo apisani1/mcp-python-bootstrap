@@ -86,6 +86,10 @@ def detect_executable_name(package_spec: str) -> Optional[str]:
             # For PyPI packages, use the package spec directly
             package_name = package_spec.split('=')[0].split('[')[0]  # Remove version constraints
 
+        # Ensure package_name is not None before processing
+        if not package_name:
+            return None
+
         # Common patterns for executable names
         # Pattern 1: test-mcp-server-ap25092201 -> test-mcp-server
         if re.match(r'^(.+)-[a-z]{2}\d{11}$', package_name):
