@@ -1,11 +1,11 @@
 #!/bin/bash
 # Enhanced Bash MCP Python Server Bootstrap
 # Supports Linux, macOS, FreeBSD, WSL
-# Version: 1.3.32
+# Version: 1.3.33
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.32"
+SCRIPT_VERSION="1.3.33"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -699,38 +699,9 @@ run_server_direct() {
             error "curl is required to download GitHub raw URLs"
         fi
     elif [[ "$package_type" == "git" ]]; then
-        # Smart fallback: check if PyPI package is available for known repositories
-        local pypi_package=""
-        if [[ "$PACKAGE_SPEC" == "git+https://github.com/apisani1/test-mcp-server-ap25092201.git" ]]; then
-            pypi_package="test-mcp-server-ap25092201"
-            log "Detected test repository with known PyPI package: $pypi_package"
-            log "Using PyPI package with standard uvx execution (most reliable for MCP servers)"
-            PACKAGE_SPEC="$pypi_package"
-            # Keep the executable name that was auto-detected earlier (test-mcp-server)
-            package_type="pypi_direct"
-        else
-            # For other repositories, try archive URL conversion to avoid git dependency
-            local archive_url
-            archive_url=$(convert_git_to_archive_url "$PACKAGE_SPEC")
-
-            if [[ $? -eq 0 && "$archive_url" != "$PACKAGE_SPEC" ]]; then
-                log "Using git-free installation via GitHub archive"
-                PACKAGE_SPEC="$archive_url"
-                package_type="github_archive"
-                # Force uvx --from syntax for archive URLs to avoid shebang issues
-                export USING_UV_FALLBACK=true
-                log "Using uvx --from syntax for archive URL to avoid executable shebang issues"
-            else
-                warn "Could not convert to archive URL, attempting original git+ URL (may require git)"
-            fi
-        fi
-
-        # Handle special package types
-        if [[ "$package_type" == "pypi_direct" ]]; then
-            # For PyPI packages with known shebang issues, use direct Python module execution
-            exec_pypi_direct_module
-            return
-        fi
+        # For git packages, use them directly - better stdin handling than PyPI conversion
+        log "Using git+ URL directly for maximum compatibility"
+        # No conversion needed - git+ URLs work well with uvx
 
         # Continue with uvx execution using the (possibly converted) package spec
         # For PyPI/git packages, use uvx with detected/installed path
