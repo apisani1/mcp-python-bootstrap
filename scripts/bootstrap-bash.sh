@@ -1,11 +1,11 @@
 #!/bin/bash
 # Enhanced Bash MCP Python Server Bootstrap
 # Supports Linux, macOS, FreeBSD, WSL
-# Version: 1.3.34
+# Version: 1.3.35
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.34"
+SCRIPT_VERSION="1.3.35"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -699,10 +699,19 @@ run_server_direct() {
             error "curl is required to download GitHub raw URLs"
         fi
     elif [[ "$package_type" == "git" ]]; then
-        # For git packages, check if git is available
+        # For git packages, check if git is available AND working
         # uvx requires git to be installed for git+ URLs
-        if ! command -v git >/dev/null 2>&1; then
-            warn "git command not found - uvx requires git for git+ URLs"
+        # On macOS, /usr/bin/git exists but is just a stub until Xcode CLT is installed
+        local git_working=false
+        if command -v git >/dev/null 2>&1; then
+            # Git command exists, but test if it actually works
+            if git --version >/dev/null 2>&1; then
+                git_working=true
+            fi
+        fi
+
+        if [[ "$git_working" == "false" ]]; then
+            warn "git command not working - uvx requires git for git+ URLs"
             warn "Attempting to detect and trigger git installation..."
 
             # Detect OS and attempt to trigger git installation
@@ -727,7 +736,7 @@ run_server_direct() {
                     local elapsed=0
 
                     while [[ $elapsed -lt $max_wait ]]; do
-                        if command -v git >/dev/null 2>&1; then
+                        if command -v git >/dev/null 2>&1 && git --version >/dev/null 2>&1; then
                             success "git is now available!"
                             local git_version=$(git --version 2>/dev/null || echo "unknown")
                             log "Git version: $git_version"
@@ -739,7 +748,7 @@ run_server_direct() {
                         elapsed=$((elapsed + wait_interval))
                     done
 
-                    if ! command -v git >/dev/null 2>&1; then
+                    if ! command -v git >/dev/null 2>&1 || ! git --version >/dev/null 2>&1; then
                         error "git installation timed out or was cancelled.
 
 To manually install git on macOS, run:

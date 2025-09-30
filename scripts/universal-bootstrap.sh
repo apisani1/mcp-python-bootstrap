@@ -1,11 +1,11 @@
 #!/bin/sh
 # Universal MCP Python Server Bootstrap
 # Detects platform and routes to appropriate implementation
-# Version: 1.3.35
+# Version: 1.3.36
 
 set -eu
 
-SCRIPT_VERSION="1.3.45"
+SCRIPT_VERSION="1.3.46"
 BASE_URL="${MCP_BOOTSTRAP_BASE_URL:-https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts}"
 CACHE_DIR="${MCP_BOOTSTRAP_CACHE_DIR:-${HOME}/.mcp/bootstrap-cache}"
 LOG_FILE="${HOME}/.mcp/bootstrap.log"
@@ -335,6 +335,12 @@ is_cache_fresh() {
         # Check for git availability check and PyPI fallback (version 1.3.34+)
         if ! grep -q "git command not found - uvx requires git" "$cache_file" 2>/dev/null; then
             log "Cache missing git availability check and PyPI fallback - forcing refresh"
+            return 1
+        fi
+
+        # Check for git working test (version 1.3.35+) - detects macOS git stub
+        if ! grep -q "git command not working - uvx requires git" "$cache_file" 2>/dev/null; then
+            log "Cache missing git working test for macOS stub detection - forcing refresh"
             return 1
         fi
     fi
