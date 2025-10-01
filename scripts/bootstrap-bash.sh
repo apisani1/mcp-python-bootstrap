@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.37"
+SCRIPT_VERSION="1.3.38"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -722,53 +722,46 @@ run_server_direct() {
                     warn "On macOS, git is part of Xcode Command Line Tools"
                     warn "Triggering installation dialog..."
 
-                    # The git stub only shows GUI dialog when run from a TTY with proper environment
-                    # We need to use osascript to trigger the dialog from a background process
-                    log "Attempting to trigger installation dialog via multiple methods..."
+                    # Trigger installation dialog and fail immediately
+                    # Claude Desktop has a 60-second timeout, so we can't wait for installation
+                    log "Triggering installation dialog..."
 
-                    # Method 1: Direct git call (works from terminal but not from Claude Desktop)
-                    git --version >/dev/null 2>&1 || true
+                    # Try multiple methods to show the dialog, redirect all output to avoid JSON-RPC issues
+                    (
+                        # Method 1: Direct xcode-select (works from terminal)
+                        xcode-select --install 2>&1 || true
 
-                    # Method 2: Use xcode-select directly (more reliable for GUI)
-                    if command -v osascript >/dev/null 2>&1; then
-                        log "Using osascript to trigger installation dialog in foreground..."
-                        # Use AppleScript to run xcode-select --install in a way that shows GUI
-                        osascript -e 'do shell script "xcode-select --install" with administrator privileges' 2>/dev/null || \
-                        osascript -e 'do shell script "xcode-select --install"' 2>/dev/null || true
-                    fi
-
-                    # Method 3: Direct xcode-select call
-                    xcode-select --install >/dev/null 2>&1 || true
-
-                    # Wait and check for git availability
-                    log "Waiting for git installation..."
-                    log "Please follow the installation dialog if it appeared"
-                    log "This process may take several minutes"
-
-                    local max_wait=600  # 10 minutes maximum wait
-                    local wait_interval=5
-                    local elapsed=0
-
-                    while [[ $elapsed -lt $max_wait ]]; do
-                        if command -v git >/dev/null 2>&1 && git --version >/dev/null 2>&1; then
-                            success "git is now available!"
-                            local git_version=$(git --version 2>/dev/null || echo "unknown")
-                            log "Git version: $git_version"
-                            break
+                        # Method 2: Use osascript (works from background process)
+                        if command -v osascript >/dev/null 2>&1; then
+                            osascript -e 'do shell script "xcode-select --install"' 2>&1 || true
                         fi
+                    ) >/dev/null 2>&1
 
-                        log "Still waiting for git installation... ($elapsed/$max_wait seconds)"
-                        sleep $wait_interval
-                        elapsed=$((elapsed + wait_interval))
-                    done
+                    # Wait briefly to let the dialog appear
+                    sleep 2
 
-                    if ! command -v git >/dev/null 2>&1 || ! git --version >/dev/null 2>&1; then
-                        error "git installation timed out or was cancelled.
+                    # Check if git appeared quickly (user had CLT ready to install)
+                    if command -v git >/dev/null 2>&1 && git --version >/dev/null 2>&1; then
+                        success "git is now available!"
+                        local git_version=$(git --version 2>/dev/null || echo "unknown")
+                        log "Git version: $git_version"
+                    else
+                        # Git not ready - fail fast with helpful message
+                        error "git installation required but not yet complete.
 
-To manually install git on macOS, run:
+The installation dialog should have appeared on your screen.
+Please complete the git installation, then reconnect to Claude Desktop.
+
+STEPS:
+1. Look for the 'Install Command Line Developer Tools' dialog
+2. Click 'Install' and wait for installation to complete (may take several minutes)
+3. After installation completes, restart Claude Desktop
+4. Reconnect to this MCP server
+
+If the dialog didn't appear, open Terminal and run:
     xcode-select --install
 
-Then retry the MCP server connection."
+For more help: https://github.com/apisani1/mcp-python-bootstrap#troubleshooting"
                     fi
                     ;;
                 Linux)
