@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.35"
+SCRIPT_VERSION="1.3.37"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -722,13 +722,27 @@ run_server_direct() {
                     warn "On macOS, git is part of Xcode Command Line Tools"
                     warn "Triggering installation dialog..."
 
-                    # Trigger the installation by attempting to use git
-                    # This will show the installation dialog to the user
+                    # The git stub only shows GUI dialog when run from a TTY with proper environment
+                    # We need to use osascript to trigger the dialog from a background process
+                    log "Attempting to trigger installation dialog via multiple methods..."
+
+                    # Method 1: Direct git call (works from terminal but not from Claude Desktop)
                     git --version >/dev/null 2>&1 || true
+
+                    # Method 2: Use xcode-select directly (more reliable for GUI)
+                    if command -v osascript >/dev/null 2>&1; then
+                        log "Using osascript to trigger installation dialog in foreground..."
+                        # Use AppleScript to run xcode-select --install in a way that shows GUI
+                        osascript -e 'do shell script "xcode-select --install" with administrator privileges' 2>/dev/null || \
+                        osascript -e 'do shell script "xcode-select --install"' 2>/dev/null || true
+                    fi
+
+                    # Method 3: Direct xcode-select call
+                    xcode-select --install >/dev/null 2>&1 || true
 
                     # Wait and check for git availability
                     log "Waiting for git installation..."
-                    log "Please follow the installation dialog that should have appeared"
+                    log "Please follow the installation dialog if it appeared"
                     log "This process may take several minutes"
 
                     local max_wait=600  # 10 minutes maximum wait
