@@ -5,7 +5,7 @@
 
 set -eu
 
-SCRIPT_VERSION="1.3.46"
+SCRIPT_VERSION="1.3.47"
 BASE_URL="${MCP_BOOTSTRAP_BASE_URL:-https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts}"
 CACHE_DIR="${MCP_BOOTSTRAP_CACHE_DIR:-${HOME}/.mcp/bootstrap-cache}"
 LOG_FILE="${HOME}/.mcp/bootstrap.log"
@@ -412,13 +412,21 @@ execute_platform_script() {
 
     case "$platform" in
         linux-bash-*|macos-bash-*|freebsd-bash-*|windows-unix-bash-*)
-            download_script "bootstrap-bash.sh" | bash -s -- "$@"
+            # CRITICAL: Don't pipe script to bash - this breaks stdin forwarding to MCP server
+            # Instead, download to file and execute it
+            local script_file="$CACHE_DIR/bootstrap-bash.sh"
+            download_script "bootstrap-bash.sh" > "$script_file"
+            bash "$script_file" "$@"
             ;;
         linux-zsh-*|macos-zsh-*|freebsd-zsh-*|windows-unix-zsh-*)
-            download_script "bootstrap-bash.sh" | zsh -s -- "$@"
+            local script_file="$CACHE_DIR/bootstrap-bash.sh"
+            download_script "bootstrap-bash.sh" > "$script_file"
+            zsh "$script_file" "$@"
             ;;
         alpine-*|linux-posix-*|macos-posix-*|*-posix-*|*-ksh-*)
-            download_script "bootstrap-posix.sh" | sh -s -- "$@"
+            local script_file="$CACHE_DIR/bootstrap-posix.sh"
+            download_script "bootstrap-posix.sh" > "$script_file"
+            sh "$script_file" "$@"
             ;;
         windows-native-*|*-powershell-*)
             local ps_script=$(download_script "bootstrap.ps1")
