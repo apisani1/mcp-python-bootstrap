@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.38"
+SCRIPT_VERSION="1.3.39"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -722,9 +722,9 @@ run_server_direct() {
                     warn "On macOS, git is part of Xcode Command Line Tools"
                     warn "Triggering installation dialog..."
 
-                    # Trigger installation dialog and fail immediately
+                    # Trigger installation dialog and show notification
                     # Claude Desktop has a 60-second timeout, so we can't wait for installation
-                    log "Triggering installation dialog..."
+                    log "Triggering installation dialog and notification..."
 
                     # Try multiple methods to show the dialog, redirect all output to avoid JSON-RPC issues
                     (
@@ -737,7 +737,12 @@ run_server_direct() {
                         fi
                     ) >/dev/null 2>&1
 
-                    # Wait briefly to let the dialog appear
+                    # Show macOS notification so user definitely sees it
+                    if command -v osascript >/dev/null 2>&1; then
+                        osascript -e 'display notification "Git is required for MCP server. Please open Terminal and run: xcode-select --install" with title "MCP Server: Git Required" sound name "default"' >/dev/null 2>&1 || true
+                    fi
+
+                    # Wait briefly to let the dialog/notification appear
                     sleep 2
 
                     # Check if git appeared quickly (user had CLT ready to install)
