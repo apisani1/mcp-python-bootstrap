@@ -85,7 +85,7 @@ The MCP Python Bootstrap system can be configured using environment variables:
 
 #### `MCP_BOOTSTRAP_BASE_URL`
 - **Description**: Base URL for downloading bootstrap scripts
-- **Default**: `https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts`
+- **Default**: `https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts`
 - **Example**: `https://internal.company.com/mcp-bootstrap/scripts`
 
 #### `MCP_BOOTSTRAP_NO_CACHE`
@@ -155,7 +155,7 @@ When you need to configure servers manually without the generator:
       "command": "sh",
       "args": [
         "-c",
-        "curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- package-name server-args..."
+        "curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- package-name server-args..."
       ]
     }
   }
@@ -192,7 +192,7 @@ When you need to configure servers manually without the generator:
       "command": "bash",
       "args": [
         "-c",
-        "curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh | bash -s -- mcp-server-name"
+        "curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh | bash -s -- mcp-server-name"
       ]
     }
   }
@@ -208,7 +208,7 @@ When you need to configure servers manually without the generator:
       "args": [
         "-ExecutionPolicy", "Bypass",
         "-Command",
-        "Invoke-RestMethod -Uri 'https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/bootstrap.ps1' | Invoke-Expression -ArgumentList 'mcp-server-name'"
+        "Invoke-RestMethod -Uri 'https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/bootstrap.ps1' | Invoke-Expression -ArgumentList 'mcp-server-name'"
       ]
     }
   }
@@ -223,7 +223,7 @@ When you need to configure servers manually without the generator:
       "command": "sh",
       "args": [
         "-c",
-        "curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-name"
+        "curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-name"
       ]
     }
   }
@@ -241,7 +241,7 @@ When you need to configure servers manually without the generator:
       "command": "bash",
       "args": [
         "-c",
-        "export https_proxy='http://proxy.company.com:8080'; export http_proxy='http://proxy.company.com:8080'; curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-name"
+        "export https_proxy='http://proxy.company.com:8080'; export http_proxy='http://proxy.company.com:8080'; curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-name"
       ]
     }
   }
@@ -257,7 +257,7 @@ When you need to configure servers manually without the generator:
       "command": "bash",
       "args": [
         "-c",
-        "export UV_INDEX_URL='https://pypi.company.com/simple/'; export UV_EXTRA_INDEX_URL='https://pypi.org/simple/'; curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- internal-mcp-server"
+        "export UV_INDEX_URL='https://pypi.company.com/simple/'; export UV_EXTRA_INDEX_URL='https://pypi.org/simple/'; curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- internal-mcp-server"
       ]
     }
   }
@@ -291,7 +291,7 @@ When you need to configure servers manually without the generator:
       "command": "bash",
       "args": [
         "-c",
-        "SCRIPT_PATH='$HOME/.mcp/bootstrap.sh'; if [ ! -f \"$SCRIPT_PATH\" ] || [ $(($(date +%s) - $(stat -c %Y \"$SCRIPT_PATH\" 2>/dev/null || echo 0))) -gt 86400 ]; then mkdir -p \"$(dirname \"$SCRIPT_PATH\")\"; curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh -o \"$SCRIPT_PATH\"; chmod +x \"$SCRIPT_PATH\"; fi; \"$SCRIPT_PATH\" mcp-server-name"
+        "SCRIPT_PATH='$HOME/.mcp/bootstrap.sh'; if [ ! -f \"$SCRIPT_PATH\" ] || [ $(($(date +%s) - $(stat -c %Y \"$SCRIPT_PATH\" 2>/dev/null || echo 0))) -gt 86400 ]; then mkdir -p \"$(dirname \"$SCRIPT_PATH\")\"; curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh -o \"$SCRIPT_PATH\"; chmod +x \"$SCRIPT_PATH\"; fi; \"$SCRIPT_PATH\" mcp-server-name"
       ]
     }
   }
@@ -307,7 +307,7 @@ When you need to configure servers manually without the generator:
       "command": "bash",
       "args": [
         "-c",
-        "export MCP_BOOTSTRAP_NO_CACHE='true'; export UV_NO_CACHE='true'; curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-name"
+        "export MCP_BOOTSTRAP_NO_CACHE='true'; export UV_NO_CACHE='true'; curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-name"
       ]
     }
   }
@@ -325,7 +325,7 @@ When you need to configure servers manually without the generator:
       "command": "sh",
       "args": [
         "-c",
-        "curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/v1.2.0/scripts/universal-bootstrap.sh | sh -s -- mcp-server-name==1.0.0"
+        "curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/v1.2.0/scripts/universal-bootstrap.sh | sh -s -- mcp-server-name==1.0.0"
       ]
     }
   }
@@ -341,7 +341,7 @@ When you need to configure servers manually without the generator:
       "command": "sh",
       "args": [
         "-c",
-        "curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-database==1.2.0"
+        "curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-database==1.2.0"
       ]
     }
   }
@@ -368,7 +368,7 @@ ENV MCP_BOOTSTRAP_BOOTSTRAP_DIR=/app/bootstrap
 RUN mkdir -p /app/cache /app/bootstrap
 
 # Download and cache bootstrap script
-RUN curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh -o /usr/local/bin/mcp-bootstrap && \
+RUN curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh -o /usr/local/bin/mcp-bootstrap && \
     chmod +x /usr/local/bin/mcp-bootstrap
 
 CMD ["/usr/local/bin/mcp-bootstrap", "mcp-server-name"]
@@ -392,7 +392,7 @@ ENV MCP_BOOTSTRAP_BOOTSTRAP_DIR=/app/bootstrap
 RUN mkdir -p /app/cache /app/bootstrap
 
 # Download bootstrap script
-RUN curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh -o /usr/local/bin/mcp-bootstrap && \
+RUN curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh -o /usr/local/bin/mcp-bootstrap && \
     chmod +x /usr/local/bin/mcp-bootstrap
 
 CMD ["/usr/local/bin/mcp-bootstrap", "mcp-server-name"]
@@ -440,7 +440,7 @@ EOF
       "command": "bash",
       "args": [
         "-c",
-        "export MCP_BOOTSTRAP_CACHE_DIR='/tmp/mcp-cache'; curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-name"
+        "export MCP_BOOTSTRAP_CACHE_DIR='/tmp/mcp-cache'; curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-name"
       ]
     }
   }
@@ -456,7 +456,7 @@ EOF
       "command": "bash",
       "args": [
         "-c",
-        "export MCP_BOOTSTRAP_CACHE_DIR='$HOME/.mcp/cache'; export UV_NO_CACHE='false'; curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-name==1.0.0"
+        "export MCP_BOOTSTRAP_CACHE_DIR='$HOME/.mcp/cache'; export UV_NO_CACHE='false'; curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-name==1.0.0"
       ]
     }
   }
@@ -469,7 +469,7 @@ EOF
 
 ```bash
 # Download and verify checksum
-SCRIPT_URL="https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh"
+SCRIPT_URL="https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh"
 EXPECTED_SHA256="your-expected-sha256-here"
 
 curl -sSL "$SCRIPT_URL" -o bootstrap.sh

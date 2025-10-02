@@ -106,7 +106,7 @@ The MCP Python Bootstrap provides a universal way to run Python MCP servers with
       "command": "sh",
       "args": [
         "-c",
-        "curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-filesystem"
+        "curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-filesystem"
       ]
     }
   }
@@ -122,7 +122,7 @@ The MCP Python Bootstrap provides a universal way to run Python MCP servers with
       "command": "sh",
       "args": [
         "-c",
-        "curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-database==1.2.0 --config ./config.json"
+        "curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-database==1.2.0 --config ./config.json"
       ]
     }
   }
@@ -138,7 +138,7 @@ The MCP Python Bootstrap provides a universal way to run Python MCP servers with
       "command": "sh",
       "args": [
         "-c",
-        "curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- git+https://github.com/user/custom-mcp-server.git@main"
+        "curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- git+https://github.com/user/custom-mcp-server.git@main"
       ]
     }
   }
@@ -151,13 +151,13 @@ The MCP Python Bootstrap provides a universal way to run Python MCP servers with
 
 ```bash
 # Direct execution
-curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-filesystem
+curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-filesystem
 
 # With caching
 SCRIPT_PATH="$HOME/.mcp/universal-bootstrap.sh"
 if [ ! -f "$SCRIPT_PATH" ] || [ $(($(date +%s) - $(stat -c %Y "$SCRIPT_PATH" 2>/dev/null || echo 0))) -gt 86400 ]; then
     mkdir -p "$(dirname "$SCRIPT_PATH")"
-    curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh -o "$SCRIPT_PATH"
+    curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh -o "$SCRIPT_PATH"
     chmod +x "$SCRIPT_PATH"
 fi
 "$SCRIPT_PATH" mcp-server-filesystem
@@ -167,10 +167,10 @@ fi
 
 ```powershell
 # Download and execute
-Invoke-RestMethod -Uri "https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/bootstrap.ps1" | Invoke-Expression -ArgumentList "mcp-server-filesystem"
+Invoke-RestMethod -Uri "https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/bootstrap.ps1" | Invoke-Expression -ArgumentList "mcp-server-filesystem"
 
 # Or save and execute
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/bootstrap.ps1" -OutFile "bootstrap.ps1"
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/bootstrap.ps1" -OutFile "bootstrap.ps1"
 .\bootstrap.ps1 mcp-server-filesystem
 ```
 
@@ -274,13 +274,13 @@ All arguments after the package specification are passed to the MCP server:
 
 ```bash
 # With configuration file
-curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-database --config config.json
+curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-database --config config.json
 
 # With multiple arguments
-curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-web --host 0.0.0.0 --port 8080 --debug
+curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-web --host 0.0.0.0 --port 8080 --debug
 
 # With environment variables
-DATABASE_URL=sqlite:///data.db curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-database
+DATABASE_URL=sqlite:///data.db curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-database
 ```
 
 ## Troubleshooting
