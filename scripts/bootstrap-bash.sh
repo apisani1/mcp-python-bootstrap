@@ -1,11 +1,11 @@
 #!/bin/bash
 # Enhanced Bash MCP Python Server Bootstrap
 # Supports Linux, macOS, FreeBSD, WSL
-# Version: 1.3.39
+# Version: 1.3.40
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.39"
+SCRIPT_VERSION="1.3.40"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -737,13 +737,17 @@ run_server_direct() {
                         fi
                     ) >/dev/null 2>&1
 
-                    # Show macOS notification so user definitely sees it
+                    # Show macOS dialog box so user definitely sees it
                     if command -v osascript >/dev/null 2>&1; then
-                        osascript -e 'display notification "Git is required for MCP server. Please open Terminal and run: xcode-select --install" with title "MCP Server: Git Required" sound name "default"' >/dev/null 2>&1 || true
+                        # Use display dialog instead of notification - much more visible
+                        osascript -e 'display dialog "Git is required but not installed.\n\nTo install git:\n1. Open Terminal\n2. Run: xcode-select --install\n3. Complete the installation\n4. Restart Claude Desktop\n\nThe installation may take several minutes." buttons {"OK"} default button "OK" with title "MCP Server: Git Required" with icon caution' >/dev/null 2>&1 &
+
+                        # Also show notification as backup
+                        osascript -e 'display notification "Please install git to use this MCP server" with title "MCP Server: Git Required" sound name "default"' >/dev/null 2>&1 || true
                     fi
 
-                    # Wait briefly to let the dialog/notification appear
-                    sleep 2
+                    # Wait briefly to let the dialog appear
+                    sleep 1
 
                     # Check if git appeared quickly (user had CLT ready to install)
                     if command -v git >/dev/null 2>&1 && git --version >/dev/null 2>&1; then
