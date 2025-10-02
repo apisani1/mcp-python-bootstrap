@@ -54,9 +54,10 @@ mcp-python-bootstrap/
 ├── examples/                   # Example configurations
 ├── tests/                      # Test scripts
 ├── docs/                       # Documentation
-├── .github/                    # GitHub workflows
-└── version.txt                 # Version information
+└── .github/                    # GitHub workflows
 ```
+
+**Note:** Version numbers are managed within each script file via the `SCRIPT_VERSION` variable.
 
 ## Development Guidelines
 
@@ -234,9 +235,14 @@ The project uses GitHub Actions for automated testing:
 
 2. **Update Version** (if needed)
    ```bash
-   # Update version.txt for releases
-   echo "1.2.1" > version.txt
+   # Update SCRIPT_VERSION in the modified script file(s)
+   # For example, in scripts/universal-bootstrap.sh:
+   SCRIPT_VERSION="1.3.51"
+
+   # And in scripts/bootstrap-bash.sh:
+   SCRIPT_VERSION="1.3.40"
    ```
+   **Important:** Each script maintains its own version number. Update only the scripts you modified.
 
 3. **Create Pull Request**
    - Use descriptive title and description
@@ -287,8 +293,11 @@ We use Semantic Versioning (SemVer):
 
 1. **Update Version**
    ```bash
-   echo "1.2.0" > version.txt
-   git add version.txt
+   # Update SCRIPT_VERSION in each modified script
+   # Example: In scripts/universal-bootstrap.sh
+   SCRIPT_VERSION="1.4.0"
+
+   git add scripts/universal-bootstrap.sh scripts/bootstrap-bash.sh
    git commit -m "Bump version to 1.2.0"
    ```
 
