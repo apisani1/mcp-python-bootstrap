@@ -75,12 +75,35 @@ The bootstrap system uses a **curl-based shell script** that:
 5. All installations happen in user space (no sudo required)
 
 ### Scenario 3: git Not Installed (git+ URLs)
+
+**IMPORTANT**: When git is not installed and a git+ URL is used:
+
+**On macOS:**
 1. Bootstrap script detects git+ URL package specification
-2. Checks if `git` command is available
-3. If missing on macOS: Triggers Xcode Command Line Tools installation dialog
-4. Waits up to 10 minutes for installation to complete
-5. Continues with git+ URL once git is available
-6. On Linux: Provides platform-specific git installation instructions
+2. Checks if `git` command is available and working
+3. Attempts to trigger Xcode Command Line Tools installation
+4. **Fails immediately** with clear error message (does not wait)
+5. User must manually complete git installation
+6. User restarts Claude Desktop and reconnects
+
+**Why immediate failure?**
+- Claude Desktop has a 60-second timeout for MCP initialization
+- Git installation takes 5+ minutes to complete
+- macOS background processes cannot reliably trigger system dialogs
+- The installation dialog may appear but not come to foreground
+
+**Expected User Workflow:**
+1. First connection attempt: Fails with error message in logs
+2. User sees error: "git installation required but not yet complete"
+3. User manually runs: `xcode-select --install` in Terminal
+4. User completes installation (may take several minutes)
+5. User restarts Claude Desktop
+6. Second connection attempt: Succeeds immediately
+
+**On Linux:**
+- Fails immediately with platform-specific git installation instructions
+- User must install git via package manager
+- User reconnects after installation
 
 ### Dependency Management
 - **uv/uvx** creates isolated virtual environments per package

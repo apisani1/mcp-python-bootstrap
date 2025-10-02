@@ -155,7 +155,34 @@ See `CONTRIBUTING.md` for development guidelines.
 
 ## Troubleshooting
 
-See `TROUBLESHOOTING.md` for common issues and solutions.
+### Git Not Installed (git+ URLs)
+
+When using `git+https://` URLs without git installed:
+
+**Expected Behavior:**
+1. Connection fails immediately (within 2 seconds)
+2. Error message appears in Claude Desktop logs
+3. Script attempts to trigger git installation (may not show dialog)
+
+**What to do:**
+1. Open Terminal and run: `xcode-select --install` (macOS) or your package manager (Linux)
+2. Complete the installation (takes several minutes)
+3. Restart Claude Desktop
+4. Reconnect - server will work immediately
+
+**Why it fails fast:**
+- Claude Desktop has a 60-second initialization timeout
+- Git installation takes 5+ minutes
+- Background processes cannot reliably trigger system dialogs
+- Waiting would cause timeout errors and poor user experience
+
+**Alternative:** Use PyPI packages instead of git+ URLs when available:
+```json
+// Instead of: git+https://github.com/user/mcp-server.git
+// Use: mcp-server-name (if published to PyPI)
+```
+
+See `TROUBLESHOOTING.md` for more common issues and solutions.
 
 ## License
 
