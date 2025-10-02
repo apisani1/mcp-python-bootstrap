@@ -126,7 +126,7 @@ test_script_download() {
     log "Testing script download..."
 
     export MCP_BOOTSTRAP_CACHE_DIR="$TEMP_DIR/cache"
-    export MCP_BOOTSTRAP_BASE_URL="https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts"
+    export MCP_BOOTSTRAP_BASE_URL="https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts"
 
     local script="$ROOT_DIR/scripts/universal-bootstrap.sh"
 

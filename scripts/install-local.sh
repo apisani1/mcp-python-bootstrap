@@ -5,7 +5,7 @@
 set -euo pipefail
 
 INSTALL_DIR="${1:-$HOME/.local/bin}"
-REPO_URL="https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main"
+REPO_URL="https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main"
 
 log() {
     echo "[Install] $1" >&2

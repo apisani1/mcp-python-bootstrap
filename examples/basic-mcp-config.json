@@ -4,14 +4,14 @@
       "command": "sh",
       "args": [
         "-c",
-        "curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-filesystem"
+        "curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-filesystem"
       ]
     },
     "database": {
       "command": "sh",
       "args": [
         "-c",
-        "curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-sqlite --db-path ./data.db"
+        "curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-sqlite --db-path ./data.db"
       ]
     }
   }

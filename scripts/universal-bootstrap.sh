@@ -1,7 +1,7 @@
 #!/bin/sh
 # Universal MCP Python Server Bootstrap
 # Detects platform and routes to appropriate implementation
-# Version: 1.3.36
+# Version: 1.3.50
 
 set -eu
 

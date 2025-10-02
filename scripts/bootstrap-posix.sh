@@ -1,7 +1,7 @@
 #!/bin/sh
 # POSIX-compliant MCP Python Server Bootstrap
 # Supports Alpine Linux and minimal environments
-# Version: 1.3.1
+# Version: 1.3.5
 
 set -eu
 

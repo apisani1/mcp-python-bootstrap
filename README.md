@@ -141,7 +141,7 @@ See the `examples/` directory for:
 
 ### Local Installation
 ```bash
-curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/install-local.sh | bash
+curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/install-local.sh | bash
 ```
 
 ### Testing

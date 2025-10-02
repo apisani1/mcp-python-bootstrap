@@ -9,7 +9,7 @@ services:
       - ./data:/app/data
     command: >
       sh -c "
-        curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh |
+        curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh |
         sh -s -- mcp-server-filesystem --root /app/data
       "
     environment:
@@ -26,7 +26,7 @@ services:
       - ./db:/app/db
     command: >
       sh -c "
-        curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh |
+        curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh |
         sh -s -- mcp-server-sqlite --db-path /app/db/app.db
       "
     environment:
@@ -43,7 +43,7 @@ services:
     command: >
       sh -c "
         apk add --no-cache curl &&
-        curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh |
+        curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh |
         sh -s -- mcp-server-web --port 8080 --host 0.0.0.0
       "
     environment:

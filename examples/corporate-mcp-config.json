@@ -11,7 +11,7 @@
       "command": "sh",
       "args": [
         "-c",
-        "export MCP_BOOTSTRAP_CACHE_DIR='/opt/mcp/cache'; curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-filesystem"
+        "export MCP_BOOTSTRAP_CACHE_DIR='/opt/mcp/cache'; curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- mcp-server-filesystem"
       ]
     }
   }

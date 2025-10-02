@@ -4,28 +4,28 @@
       "command": "sh",
       "args": [
         "-c",
-        "curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/v1.2.0/scripts/universal-bootstrap.sh | sh -s -- mcp-server-filesystem==2.1.0 --root /home/user/documents"
+        "curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/v1.2.0/scripts/universal-bootstrap.sh | sh -s -- mcp-server-filesystem==2.1.0 --root /home/user/documents"
       ]
     },
     "database-latest": {
       "command": "sh",
       "args": [
         "-c",
-        "curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- 'mcp-server-database>=1.0.0' --config ./db-config.json"
+        "curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- 'mcp-server-database>=1.0.0' --config ./db-config.json"
       ]
     },
     "custom-dev": {
       "command": "sh",
       "args": [
         "-c",
-        "curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- git+https://github.com/user/custom-mcp-server.git@dev"
+        "curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh | sh -s -- git+https://github.com/user/custom-mcp-server.git@dev"
       ]
     },
     "cached-filesystem": {
       "command": "bash",
       "args": [
         "-c",
-        "SCRIPT_PATH=\"$HOME/.mcp/universal-bootstrap.sh\"; if [ ! -f \"$SCRIPT_PATH\" ] || [ $(($(date +%s) - $(stat -c %Y \"$SCRIPT_PATH\" 2>/dev/null || echo 0))) -gt 86400 ]; then mkdir -p \"$(dirname \"$SCRIPT_PATH\")\"; curl -sSL https://raw.githubusercontent.com/mcp-tools/python-bootstrap/main/scripts/universal-bootstrap.sh -o \"$SCRIPT_PATH\"; chmod +x \"$SCRIPT_PATH\"; fi; \"$SCRIPT_PATH\" mcp-server-filesystem"
+        "SCRIPT_PATH=\"$HOME/.mcp/universal-bootstrap.sh\"; if [ ! -f \"$SCRIPT_PATH\" ] || [ $(($(date +%s) - $(stat -c %Y \"$SCRIPT_PATH\" 2>/dev/null || echo 0))) -gt 86400 ]; then mkdir -p \"$(dirname \"$SCRIPT_PATH\")\"; curl -sSL https://raw.githubusercontent.com/apisani1/mcp-python-bootstrap/main/scripts/universal-bootstrap.sh -o \"$SCRIPT_PATH\"; chmod +x \"$SCRIPT_PATH\"; fi; \"$SCRIPT_PATH\" mcp-server-filesystem"
       ]
     }
   }

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Enhanced Bash MCP Python Server Bootstrap
 # Supports Linux, macOS, FreeBSD, WSL
-# Version: 1.3.35
+# Version: 1.3.39
 
 set -euo pipefail
 
