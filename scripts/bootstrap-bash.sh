@@ -1,11 +1,11 @@
 #!/bin/bash
 # Enhanced Bash MCP Python Server Bootstrap
 # Supports Linux, macOS, FreeBSD, WSL
-# Version: 1.3.41
+# Version: 1.3.42
 
 set -euo pipefail
 
-SCRIPT_VERSION="1.3.41"
+SCRIPT_VERSION="1.3.42"
 
 # Store original arguments for later processing
 ORIGINAL_ARGS=("$@")
@@ -775,6 +775,25 @@ For more help: https://github.com/apisani1/mcp-python-bootstrap#troubleshooting"
                     fi
                     ;;
                 Linux)
+                    # Linux - try to show dialog with zenity or kdialog if available
+                    local server_name="${EXECUTABLE_NAME:-MCP Server}"
+                    local dialog_shown=false
+
+                    # Try zenity (GNOME/Ubuntu/Debian)
+                    if command -v zenity >/dev/null 2>&1; then
+                        zenity --warning \
+                            --title="MCP Server ${server_name}: Git Required" \
+                            --text="Git is required but not installed.\n\nGit installation cannot start automatically on Linux.\n\nTo install git, open Terminal and run:\n\nUbuntu/Debian:\n  sudo apt-get update && sudo apt-get install -y git\n\nCentOS/RHEL:\n  sudo yum install -y git\n\nFedora:\n  sudo dnf install -y git\n\nAlpine:\n  apk add git\n\nAfter installation, reconnect to the MCP server." \
+                            --width=500 2>/dev/null &
+                        dialog_shown=true
+                    # Try kdialog (KDE)
+                    elif command -v kdialog >/dev/null 2>&1; then
+                        kdialog --title "MCP Server ${server_name}: Git Required" \
+                            --sorry "Git is required but not installed.\n\nGit installation cannot start automatically on Linux.\n\nTo install git, open Terminal and run:\n\nUbuntu/Debian:\n  sudo apt-get update && sudo apt-get install -y git\n\nCentOS/RHEL:\n  sudo yum install -y git\n\nFedora:\n  sudo dnf install -y git\n\nAlpine:\n  apk add git\n\nAfter installation, reconnect to the MCP server." 2>/dev/null &
+                        dialog_shown=true
+                    fi
+
+                    # Always show error in logs too
                     error "git command not found. Please install git:
 
 Ubuntu/Debian:  sudo apt-get update && sudo apt-get install -y git

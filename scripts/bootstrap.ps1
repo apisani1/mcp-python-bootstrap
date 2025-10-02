@@ -1,6 +1,6 @@
 # Enhanced PowerShell MCP Python Server Bootstrap
 # Windows native support
-# Version: 1.2.0
+# Version: 1.3.0
 
 param(
     [Parameter(Mandatory=$true, Position=0)]
@@ -11,7 +11,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$ScriptVersion = "1.2.0"
+$ScriptVersion = "1.3.0"
 
 # Configuration
 $CacheDir = if ($env:MCP_BOOTSTRAP_CACHE_DIR) { $env:MCP_BOOTSTRAP_CACHE_DIR } else { Join-Path $env:USERPROFILE ".mcp\cache" }
@@ -283,6 +283,46 @@ function Test-PackageSpec {
 
     if (-not $isValid) {
         Write-Warn-Log "Package spec format may be invalid: $PackageSpec"
+    }
+
+    # Check if git is required and available
+    if ($PackageSpec -match '^git\+') {
+        $gitAvailable = $false
+        try {
+            $gitVersion = git --version 2>$null
+            if ($LASTEXITCODE -eq 0) {
+                $gitAvailable = $true
+            }
+        } catch {
+            $gitAvailable = $false
+        }
+
+        if (-not $gitAvailable) {
+            # Extract server name from package spec if possible
+            $serverName = "MCP Server"
+            if ($PackageSpec -match '/([^/]+?)(\.git)?$') {
+                $serverName = $matches[1]
+            }
+
+            # Show Windows dialog box
+            Add-Type -AssemblyName PresentationFramework
+            [System.Windows.MessageBox]::Show(
+                "Git is required but not installed.`n`nGit installation cannot start automatically on Windows.`n`nTo install git:`n`n1. Visit: https://git-scm.com/download/win`n2. Download and run the installer`n3. Restart Claude Desktop after installation`n`nAlternatively, use winget:`n  winget install Git.Git`n`nOr Chocolatey:`n  choco install git",
+                "MCP Server $serverName`: Git Required",
+                [System.Windows.MessageBoxButton]::OK,
+                [System.Windows.MessageBoxImage]::Warning
+            ) | Out-Null
+
+            Write-Error-Log "git is required for git+ URLs but is not installed.
+
+To install git on Windows:
+
+Option 1: Download from https://git-scm.com/download/win
+Option 2: Use winget: winget install Git.Git
+Option 3: Use Chocolatey: choco install git
+
+After installation, restart Claude Desktop and reconnect."
+        }
     }
 
     # Verify package exists
