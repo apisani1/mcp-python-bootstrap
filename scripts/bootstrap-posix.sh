@@ -1,11 +1,11 @@
 #!/bin/sh
 # POSIX-compliant MCP Python Server Bootstrap
 # Supports Alpine Linux and minimal environments
-# Version: 1.3.5
+# Version: 1.3.6
 
 set -eu
 
-SCRIPT_VERSION="1.3.5"
+SCRIPT_VERSION="1.3.6"
 
 # Handle help and version first
 case "${1:-}" in
@@ -373,21 +373,114 @@ run_server() {
             error "curl is required to download GitHub raw URLs"
         fi
     elif [ "$package_type" = "git" ]; then
-        # For git+ URLs, convert to GitHub archive URL to avoid git dependency
-        archive_url=$(convert_git_to_archive_url_posix "$PACKAGE_SPEC")
-
-        # Check if git is available, offer user-friendly guidance
-        if ! command -v git >/dev/null 2>&1; then
-            log "Git+ URL detected: $PACKAGE_SPEC"
-            warn "Git is required for git+ URLs but not found on system"
-            printf "\n📋 INSTALLATION OPTIONS:\n" >&2
-            printf "1. Allow system to install git (recommended - enables direct repo access)\n" >&2
-            printf "2. Use PyPI package instead (if available): remove 'git+' and '.git' from package name\n" >&2
-            printf "\nThe system will now prompt to install git with user approval required.\n" >&2
-            printf "If you decline, consider using the PyPI package version instead.\n" >&2
-        else
-            log "Git found at: $(command -v git) - proceeding with git+ URL"
+        # For git+ URLs, check if git is available AND working
+        git_working=false
+        if command -v git >/dev/null 2>&1; then
+            # Git command exists, but test if it actually works
+            if git --version >/dev/null 2>&1; then
+                git_working=true
+            fi
         fi
+
+        if [ "$git_working" = "false" ]; then
+            warn "git command not working - uvx requires git for git+ URLs"
+            warn "Attempting to detect and trigger git installation..."
+
+            # Detect OS and attempt to trigger git installation
+            platform=$(uname -s)
+            case "$platform" in
+                Darwin)
+                    # macOS - trigger Xcode Command Line Tools installation
+                    warn "On macOS, git is part of Xcode Command Line Tools"
+                    warn "Triggering installation dialog..."
+
+                    # Trigger installation dialog and show notification
+                    log "Triggering installation dialog and notification..."
+
+                    # Try multiple methods to show the dialog, redirect all output to avoid JSON-RPC issues
+                    (
+                        # Method 1: Direct xcode-select (works from terminal)
+                        xcode-select --install 2>&1 || true
+
+                        # Method 2: Use osascript (works from background process)
+                        if command -v osascript >/dev/null 2>&1; then
+                            osascript -e 'do shell script "xcode-select --install"' 2>&1 || true
+                        fi
+                    ) >/dev/null 2>&1
+
+                    # Show macOS dialog box so user definitely sees it
+                    if command -v osascript >/dev/null 2>&1; then
+                        # Use display dialog instead of notification - much more visible
+                        server_name="${EXECUTABLE_NAME:-MCP Server}"
+                        osascript -e "display dialog \"Git is required but not installed.\n\nFollow the instructions in the Xcode installation dialog box or, alternatively:\n\n1. Open Terminal\n2. Run: xcode-select --install\n3. Complete the installation\n4. Restart Claude Desktop\n\nThe installation may take several minutes.\" buttons {\"OK\"} default button \"OK\" with title \"MCP Server ${server_name}: Git Required\" with icon caution" >/dev/null 2>&1 &
+
+                        # Also show notification as backup
+                        osascript -e "display notification \"Please install git to use ${server_name}\" with title \"MCP Server ${server_name}: Git Required\" sound name \"default\"" >/dev/null 2>&1 || true
+                    fi
+
+                    # Wait briefly to let the dialog appear
+                    sleep 1
+
+                    # Check if git appeared quickly (user had CLT ready to install)
+                    if command -v git >/dev/null 2>&1 && git --version >/dev/null 2>&1; then
+                        success "git is now available!"
+                        git_version=$(git --version 2>/dev/null || echo "unknown")
+                        log "Git version: $git_version"
+                    else
+                        # Git not ready - fail fast with helpful message
+                        error "git installation required but not yet complete.
+
+The installation dialog should have appeared on your screen.
+Please complete the git installation, then reconnect to Claude Desktop.
+
+STEPS:
+1. Look for the 'Install Command Line Developer Tools' dialog
+2. Click 'Install' and wait for installation to complete (may take several minutes)
+3. After installation completes, restart Claude Desktop
+4. Reconnect to this MCP server
+
+If the dialog didn't appear, open Terminal and run:
+    xcode-select --install
+
+For more help: https://github.com/apisani1/mcp-python-bootstrap#troubleshooting"
+                    fi
+                    ;;
+                Linux)
+                    # Linux - try to show dialog with zenity or kdialog if available
+                    server_name="${EXECUTABLE_NAME:-MCP Server}"
+                    dialog_shown=false
+
+                    # Try zenity (GNOME/Ubuntu/Debian)
+                    if command -v zenity >/dev/null 2>&1; then
+                        zenity --warning \
+                            --title="MCP Server ${server_name}: Git Required" \
+                            --text="Git is required but not installed.\n\nGit installation cannot start automatically on Linux.\n\nTo install git, open Terminal and run:\n\nUbuntu/Debian:\n  sudo apt-get update && sudo apt-get install -y git\n\nCentOS/RHEL:\n  sudo yum install -y git\n\nFedora:\n  sudo dnf install -y git\n\nAlpine:\n  apk add git\n\nAfter installation, reconnect to the MCP server." \
+                            --width=500 2>/dev/null &
+                        dialog_shown=true
+                    # Try kdialog (KDE)
+                    elif command -v kdialog >/dev/null 2>&1; then
+                        kdialog --title "MCP Server ${server_name}: Git Required" \
+                            --sorry "Git is required but not installed.\n\nGit installation cannot start automatically on Linux.\n\nTo install git, open Terminal and run:\n\nUbuntu/Debian:\n  sudo apt-get update && sudo apt-get install -y git\n\nCentOS/RHEL:\n  sudo yum install -y git\n\nFedora:\n  sudo dnf install -y git\n\nAlpine:\n  apk add git\n\nAfter installation, reconnect to the MCP server." 2>/dev/null &
+                        dialog_shown=true
+                    fi
+
+                    # Always show error in logs too
+                    error "git command not found. Please install git:
+
+Ubuntu/Debian:  sudo apt-get update && sudo apt-get install -y git
+CentOS/RHEL:    sudo yum install -y git
+Fedora:         sudo dnf install -y git
+Alpine:         apk add git
+
+Then retry the MCP server connection."
+                    ;;
+                *)
+                    error "git command not found. Please install git for your platform, then retry."
+                    ;;
+            esac
+        fi
+
+        log "Using git+ URL directly for maximum compatibility"
 
         # Continue with uvx execution using the (possibly converted) package spec
         # For PyPI/git packages, use uvx with filtering wrapper
