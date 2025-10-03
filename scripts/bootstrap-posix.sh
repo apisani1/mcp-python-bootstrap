@@ -1,11 +1,11 @@
 #!/bin/sh
 # POSIX-compliant MCP Python Server Bootstrap
 # Supports Alpine Linux and minimal environments
-# Version: 1.3.6
+# Version: 1.3.7
 
 set -eu
 
-SCRIPT_VERSION="1.3.6"
+SCRIPT_VERSION="1.3.7"
 
 # Handle help and version first
 case "${1:-}" in
@@ -126,6 +126,8 @@ else
             case "$PACKAGE_SPEC" in
                 git+*)
                     package_name=$(echo "$PACKAGE_SPEC" | sed -E 's|git\+https?://[^/]+/[^/]+/([^/]+)(\.git)?.*|\1|')
+                    # Remove .git suffix if present (sed might not catch it)
+                    package_name=$(echo "$package_name" | sed 's/\.git$//')
                     ;;
             esac
 
