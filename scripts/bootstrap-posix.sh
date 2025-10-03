@@ -1,11 +1,11 @@
 #!/bin/sh
 # POSIX-compliant MCP Python Server Bootstrap
 # Supports Alpine Linux and minimal environments
-# Version: 1.3.7
+# Version: 1.3.8
 
 set -eu
 
-SCRIPT_VERSION="1.3.7"
+SCRIPT_VERSION="1.3.8"
 
 # Handle help and version first
 case "${1:-}" in
@@ -73,6 +73,8 @@ detect_executable_name_posix() {
         git+*)
             # Extract repository name from git URL
             repo_name=$(echo "$package_spec" | sed -E 's|git\+https?://[^/]+/[^/]+/([^/]+)(\.git)?.*|\1|')
+            # Remove .git suffix if present (sed might not catch it)
+            repo_name=$(echo "$repo_name" | sed 's/\.git$//')
 
             # Pattern: test-mcp-server-ap25092201 -> test-mcp-server
             case "$repo_name" in
